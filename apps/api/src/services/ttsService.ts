@@ -20,7 +20,7 @@ export class TTSService {
 
   constructor() {
     this.xttsBaseUrl = process.env.XTTS_API_URL || 'http://localhost:8020';
-    this.outputDir = process.env.TTS_OUTPUT_DIR || './xtts-data/output';
+    this.outputDir = process.env.TTS_OUTPUT_DIR || './xtts-data/testOutput';
     this.speakersDir = process.env.TTS_SPEAKERS_DIR || './xtts-data/speakers';
   }
 
@@ -32,19 +32,19 @@ export class TTSService {
         id: 'hawking',
         name: 'Stephen Hawking',
         description: 'Renowned theoretical physicist',
-        filePath: '/app/speakers/presets/hawking01.wav'
+        filePath: '/app/speakers/hawking01.wav'
       },
       {
         id: 'eastwood',
         name: 'Clint Eastwood',
         description: 'Iconic actor and director',
-        filePath: '/app/speakers/presets/eastwood_lawyers.wav'
+        filePath: '/app/speakers/eastwood_lawyers.wav'
       },
       {
         id: 'manson',
         name: 'Charles Manson',
         description: 'Historical figure voice',
-        filePath: '/app/speakers/presets/manson_believe_me.wav'
+        filePath: '/app/speakers/manson_believe_me.wav'
       }
     ];
 
@@ -69,7 +69,9 @@ export class TTSService {
             error: `Voice preset '${request.voicePreset}' not found`
           };
         }
+
         speakerWavPath = preset.filePath;
+
       } else if (request.customVoiceFile) {
         speakerWavPath = request.customVoiceFile;
       } else {
@@ -109,7 +111,7 @@ export class TTSService {
         success: true,
         audioUrl: `/api/tts/audio/${filename}`,
         metadata: {
-          duration: 0, // You could calculate this if needed
+          duration: 0,
           fileSize: stats.size,
           format: 'wav'
         }
@@ -124,6 +126,56 @@ export class TTSService {
     }
   }
 
+  // User voice upload and training
+  public async uploadUserVoice(
+    userId: string, 
+    audioBuffer: Buffer, 
+    originalFilename: string
+  ): Promise<{ voiceId: string; filePath: string }> {
+    const voiceId = uuidv4();
+    const extension = path.extname(originalFilename) || '.wav';
+    const filename = `${userId}_${voiceId}${extension}`;
+    const filePath = path.join(this.speakersDir, 'user-uploads', filename);
+
+    fs.writeFileSync(filePath, audioBuffer);
+
+    return {
+      voiceId,
+      filePath: `/app/speakers/user-uploads/${filename}`
+    };
+  }
+
+
+  // Audio file serving
+  public getAudioFile(filename: string): Buffer | null {
+    const filePath = path.join(this.outputDir, 'temp', filename);
+    
+    if (fs.existsSync(filePath)) {
+      return fs.readFileSync(filePath);
+    }
+    
+    return null;
+  }
+
+  // Cleanup temporary files
+  public cleanupTempFiles(olderThanMinutes: number = 60): void {
+    const tempDir = path.join(this.outputDir, 'temp');
+    const cutoffTime = Date.now() - (olderThanMinutes * 60 * 1000);
+
+    if (!fs.existsSync(tempDir)) return;
+
+    const files = fs.readdirSync(tempDir);
+    
+    files.forEach(file => {
+      const filePath = path.join(tempDir, file);
+      const stats = fs.statSync(filePath);
+      
+      if (stats.mtime.getTime() < cutoffTime) {
+        fs.unlinkSync(filePath);
+        console.log(`Cleaned up temp file: ${file}`);
+      }
+    });
+  }
   
 }
 
