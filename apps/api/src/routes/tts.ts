@@ -125,6 +125,7 @@ router.post('/speak', async (req: Request, res: Response) => {
   }
 });
 
+//TODO: figure out how we can take input, where to store it, and how to process it
 // Generate speech with uploaded voice
 router.post('/speak-custom', async (req: Request, res: Response) => {
   try {
@@ -138,7 +139,7 @@ router.post('/speak-custom', async (req: Request, res: Response) => {
       return res.status(400).json(response);
     }
 
-    const customVoiceFile = `/app/speakers/user-uploads/${userId}_${voiceId}.wav`;
+    const customVoiceFile = `/app/speakers/user-uploads/${userId}_${voiceId}.wav`; //an assumption
     
     const ttsRequest: TTSRequest = {
       text,
