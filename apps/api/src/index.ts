@@ -3,6 +3,7 @@ import dotenv from 'dotenv'
 import * as path from 'path'
 import cors from 'cors'
 import { TTSFactory } from './Factories/TTSFactory'
+import { MongoAnalyticsLogger } from './Utilities/AnalyticsLogger'
 
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') })
 
@@ -16,13 +17,17 @@ const voiceProvider = TTSFactory.createElevenLabsVoiceProvider()
 
 app.post('/api/v1/tts', async (req, res) => {
   try {
-    const { text, voiceId, modelId } = req.body ?? {}
+    const { text, voiceId, modelId, userId } = req.body ?? {}
     
     if (!text) {
       return res.status(400).json({ error: 'Text is required' })
     }
 
-    const audio = await ttsService.synthesize({ text, voiceId, modelId })
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required'})
+    }
+
+    const audio = await ttsService.synthesize({ text, voiceId, modelId, userId })
     
     res.setHeader('Content-Type', audio.mimeType)
     res.send(audio.data)
@@ -63,7 +68,40 @@ app.get('/api/v1/voices/:id', async (req, res) => {
   }
 })
 
+app.get('/api/v1/analytics/user/:userId/daily/:date', async (req, res) => {
+  try {
+    const { userId, date } = req.params
+    const analytics = new MongoAnalyticsLogger(process.env.MONGODB_URI!, process.env.MONGODB_DATABASE!)
+    const stats = await analytics.getUserDailyStats(userId, date)
+    res.json(stats)
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get user daily stats' })
+  }
+})
 
+app.get('/api/v1/analytics/user/:userId/summary', async (req, res) => {
+  try {
+    const { userId } = req.params
+    const days = req.query.days ? Number(req.query.days) : 30
+    const analytics = new MongoAnalyticsLogger(process.env.MONGODB_URI!, process.env.MONGODB_DATABASE!)
+    const summary = await analytics.getUserUsageSummary(userId, days)
+    res.json(summary)
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get user summary' })
+  }
+})
+
+app.get('/api/v1/analytics/users/top', async (req, res) => {
+  try {
+    const days = req.query.days ? Number(req.query.days) : 30
+    const limit = req.query.limit ? Number(req.query.limit) : 10
+    const analytics = new MongoAnalyticsLogger(process.env.MONGODB_URI!, process.env.MONGODB_DATABASE!)
+    const topUsers = await analytics.getTopUsers(days, limit)
+    res.json(topUsers)
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get top users' })
+  }
+})
 
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000

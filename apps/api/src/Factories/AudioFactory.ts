@@ -1,4 +1,4 @@
-import { Audio } from '../../TextToSpeechInterface'
+import { Audio } from '../../Interfaces'
 import { AudioAnalyzer } from '../Utilities/AudioAnalyzer'
 
 export class AudioImpl implements Audio {

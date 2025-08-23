@@ -1,4 +1,4 @@
-import { IConfigProvider, RequestConfig } from '../../TextToSpeechInterface'
+import { IConfigProvider, RequestConfig } from '../../Interfaces'
 
 export class ElevenLabsConfigProvider implements IConfigProvider {
   getApiKey(): string {
@@ -33,5 +33,14 @@ export class ElevenLabsConfigProvider implements IConfigProvider {
       maxLength: Number(process.env.TTS_MAX_TEXT_LENGTH) || 5000,
       warningLength: Number(process.env.TTS_WARNING_TEXT_LENGTH) || 2500
     }
+  }
+
+  getMongoConfig(): { uri: string; database: string } {
+    const uri = process.env.MONGODB_URI
+    const database = process.env.MONGODB_DATABASE || 'ai_narration'
+
+    if (!uri) throw new Error('Missing MONGODB_URI')
+
+    return { uri, database }
   }
 }

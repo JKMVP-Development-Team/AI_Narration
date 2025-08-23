@@ -1,4 +1,4 @@
-import { ITextToSpeech, SynthesizeInput, Audio, IHttpClient, IConfigProvider, ITextValidator, IAnalyticsLogger, SynthesisMetrics } from '../../TextToSpeechInterface'
+import { ITextToSpeech, SynthesizeInput, Audio, IHttpClient, IConfigProvider, ITextValidator, IAnalyticsLogger, SynthesisMetrics } from '../../Interfaces'
 import { AudioFactory } from '../Factories/AudioFactory'
 
 export class ElevenLabsTTS implements ITextToSpeech {
@@ -47,8 +47,7 @@ export class ElevenLabsTTS implements ITextToSpeech {
         text: processedInput.text
       })
 
-      const requestConfig = this.config.getRequestConfig()
-      const response = await this.httpClient.post(url, { headers, body }, requestConfig)
+      const response = await this.httpClient.post(url, { headers, body }, this.config.getRequestConfig())
       
       
       if (!response.ok) {
@@ -74,6 +73,7 @@ export class ElevenLabsTTS implements ITextToSpeech {
 
       // Log synthesis metrics
       const metrics: SynthesisMetrics = {
+        userId: input.userId,
         charactersRequested: originalCharCount,
         charactersProcessed: processedCharCount,
         audioDurationSeconds: audio.duration || 0,

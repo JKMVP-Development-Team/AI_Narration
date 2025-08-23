@@ -1,4 +1,4 @@
-import { ITextValidator, ValidationResult } from '../../TextToSpeechInterface'
+import { ITextValidator, ValidationResult } from '../../Interfaces'
 
 export class TTSTextValidator implements ITextValidator {
   constructor(

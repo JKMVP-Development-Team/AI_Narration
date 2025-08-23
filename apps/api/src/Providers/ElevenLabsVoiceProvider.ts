@@ -1,4 +1,4 @@
-import { IVoiceProvider, Voice, IHttpClient, IConfigProvider } from '../../TextToSpeechInterface'
+import { IVoiceProvider, Voice, IHttpClient, IConfigProvider } from '../../Interfaces'
 
 export class ElevenLabsVoiceProvider implements IVoiceProvider {
   constructor(

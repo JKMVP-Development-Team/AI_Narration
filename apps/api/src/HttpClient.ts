@@ -1,4 +1,4 @@
-import { IHttpClient, RequestConfig } from '../TextToSpeechInterface'
+import { IHttpClient, RequestConfig } from '../Interfaces'
 
 export class FetchHttpClient implements IHttpClient {
   async post(
