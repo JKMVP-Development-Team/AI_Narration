@@ -4,6 +4,7 @@ import { FetchHttpClient } from '../HttpClient'
 import { ElevenLabsConfigProvider } from '../Providers/ConfigProvider'
 import { ElevenLabsVoiceProvider } from '../Providers/ElevenLabsVoiceProvider'
 import { TTSTextValidator } from '../Utilities/TextValidator'
+import { ConsoleAnalyticsLogger } from '../Utilities/AnalyticsLogger'
 
 export class TTSFactory {
   static createElevenLabsTTS(): ITextToSpeech {
@@ -11,8 +12,9 @@ export class TTSFactory {
     const config = new ElevenLabsConfigProvider()
     const textLimits = config.getTextLimits()
     const textValidator = new TTSTextValidator(textLimits.maxLength, textLimits.warningLength)
+    const analyticsLogger = new ConsoleAnalyticsLogger()
     
-    return new ElevenLabsTTS(httpClient, config, textValidator)
+    return new ElevenLabsTTS(httpClient, config, textValidator, analyticsLogger)
   }
 
   static createElevenLabsVoiceProvider(): IVoiceProvider {

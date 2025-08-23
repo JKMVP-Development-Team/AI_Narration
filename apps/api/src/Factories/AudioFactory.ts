@@ -1,9 +1,11 @@
 import { Audio } from '../../TextToSpeechInterface'
+import { AudioAnalyzer } from '../Utilities/AudioAnalyzer'
 
 export class AudioImpl implements Audio {
   constructor(
     public readonly data: Buffer,
-    public readonly mimeType: string
+    public readonly mimeType: string,
+    public readonly duration?: number
   ) {}
 
   toBase64(): string {
@@ -17,6 +19,11 @@ export class AudioImpl implements Audio {
 
 export class AudioFactory {
   static createMp3Audio(buffer: Buffer): Audio {
-    return new AudioImpl(buffer, 'audio/mpeg')
+    const duration = AudioAnalyzer.calculateMP3Duration(buffer)
+    return new AudioImpl(buffer, 'audio/mpeg', duration)
+  }
+
+  static createAudioWithDuration(buffer: Buffer, mimeType: string, duration: number): Audio {
+    return new AudioImpl(buffer, mimeType, duration)
   }
 }

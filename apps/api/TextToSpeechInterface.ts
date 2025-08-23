@@ -7,7 +7,7 @@ export interface SynthesizeInput {
 export interface Audio {
   data: Buffer     
   mimeType: string
-
+  duration?: number
   toBase64(): string
   toDataUrl(): string
 }
@@ -39,6 +39,23 @@ export interface ValidationResult {
   isValid: boolean
   error?: string
   truncatedText?: string
+}
+
+
+export interface SynthesisMetrics {
+  charactersRequested: number
+  charactersProcessed: number
+  audioDurationSeconds: number
+  voiceId: string
+  modelId: string
+  timestamp: Date
+  processingTimeMs: number
+}
+
+
+export interface IAnalyticsLogger {
+  logSynthesis(metrics: SynthesisMetrics): void
+  logError(error: string, context: any): void
 }
 
 export interface IVoiceProvider {
