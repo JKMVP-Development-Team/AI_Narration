@@ -12,10 +12,11 @@ interface VoicePreset {
 }
 
 function App() {
+  // State for text input and selected voice
   const [text, setText] = useState('Welcome to the AI Narration App! This dark mode interface is designed for comfortable extended use. Enter your text and let our AI create beautiful narration for you.');
   const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
 
-  // Voice presets data
+  // Voice presets data that is hardcoded for now
   const voicePresets: VoicePreset[] = [
     {
       id: "sarah",
@@ -36,7 +37,7 @@ function App() {
     {
       id: "maria",
       name: "Maria",
-      style: "Conversational",
+      style: "Conversation",
       gender: "Female",
       accent: "Spanish",
       description: "Warm, friendly voice ideal for storytelling and casual content"
@@ -67,34 +68,40 @@ function App() {
     }
   ];
 
+  // Handlers for buttons
   const handleGenerate = () => {
     if (!selectedVoice) {
       alert('Please select a voice first!');
       return;
     }
-    // Your generation logic here
-    alert(`Generating narration with voice: ${selectedVoice}`);
+    // TODO: generation logic here
+    const selected = voicePresets.find(voice => voice.id === selectedVoice);
+    alert(`Generating narration with voice: ${selected?.name}`);
   };
 
   const handleSave = () => {
-    // Your save logic here
+    // TODO: save logic here
     alert('Audio saved successfully!');
   };
 
+  // clear text area
   const handleClear = () => {
     setText('');
   };
 
+  //TODO: Handle voice selection
   const handleVoiceSelect = (voiceId: string) => {
     setSelectedVoice(voiceId);
   };
 
+  // Handle voice preview
   const handlePreview = (voiceName: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent triggering the select event
     alert(`Previewing voice: ${voiceName}`);
   };
 
   return (
+    // Main container
     <div className="container">
       <header>
         <h1>AI Narration Studio</h1>
@@ -108,7 +115,8 @@ function App() {
           onChange={(e) => setText(e.target.value)}
         />
       </div>
-      
+
+      {/* Button Controls*/}
       <div className="controls">
         <button className="primary-btn" onClick={handleGenerate}>
           <i className="fas fa-play-circle"></i>
