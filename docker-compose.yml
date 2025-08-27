@@ -1,0 +1,43 @@
+services:
+  # Your API server
+  api:
+    build: 
+      context: .
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - XTTS_API_URL=http://xtts-server:8020
+    depends_on:
+      - xtts-server
+    volumes:
+      - ./uploads:/app/uploads
+
+  # XTTS Server
+  xtts-server:
+    image: daswer123/xtts-api-server:latest
+    ports:
+      - "8020:8020"
+    volumes:
+      - xtts-data:/app/speakers
+      - xtts-models:/app/models
+      - xtts-output:/app/output
+    environment:
+      - DEVICE=cpu  # Change to 'cuda' for GPU
+    restart: unless-stopped
+
+  # Your frontend (if deploying together)
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  xtts-data:
+  xtts-models:
+  xtts-output:

@@ -1,0 +1,13 @@
+services:
+  # Only run XTTS in Docker, keep your Node.js apps local for development
+  xtts-server:
+    image: daswer123/xtts-api-server:latest
+    ports:
+      - "8020:8020"
+    volumes:
+      - ./xtts-data/speakers:/app/speakers
+      - ./xtts-data/models:/app/models
+      - ./xtts-data/output:/app/output
+    environment:
+      - DEVICE=cpu
+    restart: unless-stopped
