@@ -5,13 +5,6 @@ import App from './App'
 import LandingPage from "./LandingPage";
 import "./app.css";
 
-/*W
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
-*/
 
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 root.render(
@@ -19,7 +12,7 @@ root.render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/app" element={<App />} />
+        <Route path="/home" element={<App />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

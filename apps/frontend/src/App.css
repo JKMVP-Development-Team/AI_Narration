@@ -381,3 +381,35 @@ button:active {
   margin: 0 auto 1rem auto;
   border-top: 1px solid #444;
 }
+
+/* Landing Page */
+.landing-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: rgba(26, 27, 44, 0.95);
+  text-align: center;
+  color: #fff;
+  padding: 2rem;
+}
+
+.landing-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  max-width: 600px;
+}
+
+.landing-title {
+  font-size: 3.5rem;
+  margin-bottom: 1rem;
+}
+
+.landing-subtitle {
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
+  color: #a0a0c0;
+}
+
