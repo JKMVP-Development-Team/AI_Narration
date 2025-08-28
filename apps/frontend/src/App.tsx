@@ -218,6 +218,11 @@ function App() {
           ))}
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="footer">
+        <p>© 2025 JKMVP AI Narration. Powered by advanced AI voice synthesis.</p>
+      </footer>
     </div>
   );
 }

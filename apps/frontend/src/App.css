@@ -364,3 +364,20 @@ button:active {
     justify-content: center;
   }
 }
+
+/* Footer Styles */
+.footer {
+  text-align: center;
+  margin-top: 3rem;
+  padding-top: 1rem;
+  font-size: 0.8rem;
+  color: #a0a0c0;
+}
+
+.footer::before {
+  content: "";
+  display: block;
+  width: 100%;
+  margin: 0 auto 1rem auto;
+  border-top: 1px solid #444;
+}
