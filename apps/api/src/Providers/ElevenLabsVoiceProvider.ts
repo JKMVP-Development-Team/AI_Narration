@@ -7,10 +7,11 @@ export class ElevenLabsVoiceProvider implements IVoiceProvider {
   ) {}
 
   async getVoices(limit = 10): Promise<Voice[]> {
-    const url = `${this.config.getBaseUrl()}/voices`
+    const url = `https://api.elevenlabs.io/v2/voices`
 
     const headers = {
-      'xi-api-key': this.config.getApiKey()
+      'xi-api-key': this.config.getApiKey(),
+      'Accept': 'application/json'
     }
 
     const response = await this.httpClient.get(url, { headers })
@@ -19,7 +20,7 @@ export class ElevenLabsVoiceProvider implements IVoiceProvider {
       throw new Error(`Failed to get voices: ${response.status} ${response.statusText}`)
     }
 
-    const data = await response.json()
+    const data = await response.json() as { voices: any[] }
     const voices = (data.voices ?? []).slice(0, limit)
     
     return voices.map(this.mapToVoice)

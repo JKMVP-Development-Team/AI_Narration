@@ -9,8 +9,10 @@ import { MongoAnalyticsLogger } from './Utilities/AnalyticsLogger';
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
 
+const stripe = require('stripe')(process.env.STRIPE_API_KEY);
 const app = express();
 const PORT = process.env.PORT || 3001;
+const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Middleware
 app.use(cors());
@@ -112,6 +114,99 @@ app.get('/api/v1/analytics/users/top', async (req, res) => {
     res.json(topUsers);
   } catch (error) {
     res.status(500).json({ error: 'Failed to get top users' });
+  }
+});
+
+
+// ========== STRIPE ROUTES =================
+
+app.post('/create-checkout-session', async (req, res) => {
+  try {
+    const { priceId, planName, userId, credits, customerEmail } = req.body;
+
+    let customer;
+    
+    // Create or retrieve existing customer
+    if (customerEmail) {
+      // Check if customer already exists
+      const existingCustomers = await stripe.customers.list({
+        email: customerEmail,
+        limit: 1
+      });
+      
+      if (existingCustomers.data.length > 0) {
+        customer = existingCustomers.data[0];
+        console.log(`🔍 Found existing customer: ${customer.id}`);
+      } else {
+        // Create new customer
+        customer = await stripe.customers.create({
+          email: customerEmail,
+          metadata: {
+            userId: userId || 'anonymous',
+            source: 'ai_narration_app'
+          }
+        });
+        console.log(`✨ Created new customer: ${customer.id}`);
+      }
+    }
+
+
+    const session = await stripe.checkout.sessions.create({
+      line_items: [
+        {
+          price: 'price_1S0vfk7ev7V2kfjiiZauwMJx', // $20 for 200 credits
+          quantity: 1,
+        },
+      ],
+      mode: 'payment',
+      success_url: `${FRONTEND}?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND}?canceled=true`,
+      automatic_tax: { enabled: true },
+      customer_creation: customerEmail ? 'if_required' : 'always',
+      customer: customer?.id,
+      metadata: {
+        planName: planName || 'Credit Package',
+        userId: userId || 'anonymous',
+        credits: credits || '200',
+        purchaseType: 'credits'
+      },
+      allow_promotion_codes: true,
+      billing_address_collection: 'auto',
+      customer_update: customer ? {
+        address: 'auto',
+        name: 'auto'
+      } : undefined,
+      invoice_creation: {
+        enabled: true,
+        invoice_data: {
+          description: `AI Narration Credits - ${planName || 'Credit Package'}`,
+          metadata: {
+            planName: planName || 'Credit Package',
+            userId: userId || 'anonymous',
+            credits: credits || '200',
+            purchaseType: 'credits'
+          }
+        }
+      }
+    });
+
+    console.log("Checkout Session Created:", session.id);
+
+    // For API calls, return JSON
+    if (req.headers.accept?.includes('application/json')) {
+      return res.json({
+        success: true,
+        sessionId: session.id,
+        url: session.url,
+        customerId: customer?.id
+      });
+    }
+    
+    // For form submissions, redirect
+    res.redirect(303, session.url);
+  } catch (error: any) {
+    console.error('Error creating checkout session:', error);
+    res.status(400).json({ success: false, error: 'Failed to create checkout session' });
   }
 });
 
