@@ -8,22 +8,15 @@
 body {
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
   color: #e6e6e6;
 }
 
 .container {
   background: rgba(26, 27, 44, 0.95);
-  border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  width: 95%;
-  max-width: 850px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 100vh;
   padding: 40px;
   text-align: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 header {
@@ -49,6 +42,9 @@ h1 {
   flex-direction: column;
   gap: 20px;
   margin-bottom: 25px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 textarea {
@@ -80,6 +76,9 @@ textarea::placeholder {
   gap: 15px;
   flex-wrap: wrap;
   margin-bottom: 30px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 button {
@@ -124,6 +123,9 @@ button:active {
 .voice-presets {
   text-align: left;
   margin-top: 30px;
+  max-width: 800px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .voice-presets h2 {
@@ -137,7 +139,7 @@ button:active {
 
 .presets-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr); /* Changed from auto-fill to fixed 2 columns */
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
   margin-top: 20px;
 }
