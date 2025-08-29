@@ -32,7 +32,6 @@ export class DatabaseService {
             const dbName = process.env.MONGODB_DATABASE || 'ai_narration'
 
             console.log(`Attempting to connect to MongoDB...`)
-            console.log(`URI: ${uri.replace(/\/\/.*@/, '\/\/***:***@')}`)
             console.log(`Database: ${dbName}`)
             
             this.client = new MongoClient(uri, {
