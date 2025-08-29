@@ -3,17 +3,17 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import * as path from 'path';
 import { ttsRoutes } from './routes/tts';
+import { stripeRoutes } from './routes/stripe';
+import { userRoutes } from './routes/user';
 import { TTSFactory } from './Factories/TTSFactory';
 import { MongoAnalyticsLogger } from './Utilities/AnalyticsLogger';
-import { getUserByUserId, createOrUpdateUser, deleteUserAndStripeCustomer, deleteUserByUserId } from './services/userService';
-import { getStripeInstance, getStripeCustomers } from './services/stripeService';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
 
 const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
-const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:3000';
+
 
 // Middleware
 app.use(cors());
@@ -22,6 +22,8 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Routes
 app.use('/api/tts', ttsRoutes);
+app.use('/api/stripe', stripeRoutes);
+app.use('/api/user', userRoutes);
 
 // TODO: Extract these /api/v1/ endpoints to separate route files
 // Then use: app.use('/api/v1', v1Routes);
@@ -116,153 +118,6 @@ app.get('/api/v1/analytics/users/top', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Failed to get top users' });
   }
-});
-
-
-// ========== STRIPE ROUTES =================
-
-app.post('/create-checkout-session', async (req, res) => {
-  try {
-    const stripe = getStripeInstance();
-    const { priceId, planName, userId, credits, customerEmail } = req.body;
-
-    let user = await getUserByUserId(userId);
-
-    const session = await stripe.checkout.sessions.create({
-      line_items: [
-        {
-          price: 'price_1S0vfk7ev7V2kfjiiZauwMJx', // $20 for 200 credits
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: `${FRONTEND}`,
-      cancel_url: `${FRONTEND}`,
-      // automatic_tax: { enabled: true }, // TODO Enable tax calculation once we have a valid address
-      customer_creation: customerEmail ? 'if_required' : 'always',
-      customer: user?.stripeCustomerId,
-      metadata: {
-        planName: planName || 'Credit Package',
-        userId: userId || 'anonymous',
-        credits: credits || '200',
-        purchaseType: 'credits'
-      },
-      allow_promotion_codes: true,
-      billing_address_collection: 'auto',
-      customer_update: user ? { name: user.name, email: user.email } : undefined,
-      invoice_creation: {
-        enabled: true,
-        invoice_data: {
-          description: `AI Narration Credits - ${planName || 'Credit Package'}`,
-          metadata: {
-            planName: planName || 'Credit Package',
-            userId: userId || 'anonymous',
-            credits: credits || '200',
-            purchaseType: 'credits'
-          }
-        }
-      }
-    });
-
-    console.log("Checkout Session Created:", session.id);
-
-    // For API calls, return JSON
-    if (req.headers.accept?.includes('application/json')) {
-      return res.json({
-        success: true,
-        sessionId: session.id,
-        url: session.url,
-        customerId: user?.stripeCustomerId
-      });
-    }
-
-    // For form submissions, redirect
-    res.redirect(303, session.url);
-  } catch (error: any) {
-    console.error('Error creating checkout session:', error);
-    res.status(400).json({ success: false, error: 'Failed to create checkout session' });
-  }
-});
-
-// ========== USER MANAGEMENT ==========
-
-app.post('/api/v1/create-account', async (req, res) => {
-  try {
-    const { userId, name, email, address } = req.body;
-
-    let data = { userId, name, email, address};
-
-    const user = await createOrUpdateUser(data);
-    res.json({ success: true, user });
-  } catch (error) {
-    console.error('Error creating users:', error);
-    res.status(500).json({ error: 'Failed to create users' });
-  }
-});
-
-app.get('/api/v1/stripe/customers', async (req, res) => {
-  try {
-    const customers = await getStripeCustomers();
-    res.json({ success: true, customers });
-  } catch (error) {
-    console.error('Error fetching Stripe customers:', error); 
-    res.status(500).json({ success: false, error: 'Failed to fetch Stripe customers' });
-  }
-});
-
-app.delete('/api/v1/stripe/customers/:customerId', async (req, res) => {
-    try {
-        const { customerId } = req.params;
-        const result = await deleteUserAndStripeCustomer(customerId);
-        
-        if (result.success) {
-            res.json({ 
-                success: true, 
-                message: `User and Stripe customer ${customerId} deleted successfully`,
-                deletedUser: result.deletedUser,
-                deletedStripeCustomer: result.deletedStripeCustomer
-            });
-        } else {
-            res.status(404).json({ 
-                success: false, 
-                error: result.error 
-            });
-        }
-    } catch (error) {
-        console.error('Error in delete endpoint:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Internal server error while deleting customer' 
-        });
-    }
-});
-
-
-app.delete('/api/v1/users/:userId', async (req, res) => {
-    try {
-        const { userId } = req.params;
-        const result = await deleteUserByUserId(userId);
-        
-        if (result.success) {
-            res.json({ 
-                success: true, 
-                message: `User ${userId} deleted successfully`,
-                deletedUser: result.deletedUser,
-                deletedStripeCustomer: result.deletedStripeCustomer
-            });
-        } else {
-            res.status(404).json({ 
-                success: false, 
-                error: result.error 
-            });
-        }
-    } catch (error) {
-        console.error('Error in delete user endpoint:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Internal server error while deleting user' 
-        });
-    }
 });
 
 // ========== END V1 API ENDPOINTS ==========

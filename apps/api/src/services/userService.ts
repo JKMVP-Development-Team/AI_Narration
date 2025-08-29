@@ -315,29 +315,41 @@ export async function deleteUserAndStripeCustomer(customerId: string): Promise<{
         const usersCollection = await db.getCollection('users');
 
         // 1. Find the user first
-        const user = await usersCollection.findOne({ stripeCustomerId: customerId });
+        let user = await usersCollection.findOne({ stripeCustomerId: customerId });
+
+        if (!user) {
+            try {
+                user = await usersCollection.findOne({ _id: new ObjectId(customerId) });
+            } catch (error) {
+                console.log('Invalid ObjectId provided');
+            }
+        }
+        
         if (!user) {
             return {
                 success: false,
-                error: 'User not found with this Stripe customer ID'
+                error: 'User not found'
             };
         }
 
-        console.log(`🗑️ Deleting user ${user._id} and Stripe customer ${customerId}`);
+        console.log(`Deleting user ${user._id} and Stripe customer ${customerId}`);
 
-        // 2. Delete from Stripe first (external service)
-        const stripeDeleted = await deleteStripeCustomer(customerId);
-        if (!stripeDeleted) {
-            return {
-                success: false,
-                error: 'Failed to delete Stripe customer'
-            };
+        let stripeDeleted = true;
+
+        if (user.stripeCustomerId) {
+            stripeDeleted = await deleteStripeCustomer(user.stripeCustomerId);
+
+            if (!stripeDeleted) {
+                console.warn('Failed to delete Stripe customer, aborting user deletion');
+            } 
+        } else {
+            console.log('No Stripe customer ID associated with user, skipping Stripe deletion');
         }
 
         // 3. Delete from our database
         const deleteResult = await usersCollection.deleteOne({ _id: user._id });
         if (deleteResult.deletedCount === 0) {
-            console.error('⚠️ Stripe customer deleted but failed to delete user from database');
+            console.error('Stripe customer deleted but failed to delete user from database');
             return {
                 success: false,
                 error: 'Failed to delete user from database (but Stripe customer was deleted)'
@@ -352,7 +364,7 @@ export async function deleteUserAndStripeCustomer(customerId: string): Promise<{
             deletedAt: new Date().toISOString()
         });
 
-        console.log(`✅ Successfully deleted user ${user._id} and Stripe customer ${customerId}`);
+        console.log(`Successfully deleted user ${user._id} and Stripe customer ${customerId}`);
 
         return {
             success: true,
@@ -372,7 +384,7 @@ export async function deleteUserAndStripeCustomer(customerId: string): Promise<{
         };
 
     } catch (error) {
-        console.error('❌ Error deleting user and Stripe customer:', error);
+        console.error('Error deleting user and Stripe customer:', error);
         return {
             success: false,
             error: `Failed to delete user and customer: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -380,81 +392,6 @@ export async function deleteUserAndStripeCustomer(customerId: string): Promise<{
     }
 }
 
-export async function deleteUserByUserId(userId: string): Promise<{
-    success: boolean;
-    deletedUser?: UserAccount;
-    deletedStripeCustomer?: boolean;
-    error?: string;
-}> {
-    try {
-        const db = DatabaseService.getInstance();
-        const usersCollection = await db.getCollection('users');
-
-        // 1. Find the user first
-        const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
-        if (!user) {
-            return {
-                success: false,
-                error: 'User not found'
-            };
-        }
-
-        console.log(`🗑️ Deleting user ${userId} and Stripe customer ${user.stripeCustomerId}`);
-
-        let stripeDeleted = true;
-        
-        // 2. Delete from Stripe if customer exists
-        if (user.stripeCustomerId) {
-            stripeDeleted = await deleteStripeCustomer(user.stripeCustomerId);
-            if (!stripeDeleted) {
-                console.warn('Failed to delete Stripe customer, continuing with user deletion');
-            }
-        }
-
-        // 3. Delete from our database
-        const deleteResult = await usersCollection.deleteOne({ _id: user._id });
-        if (deleteResult.deletedCount === 0) {
-            return {
-                success: false,
-                error: 'Failed to delete user from database'
-            };
-        }
-
-        // 4. Log the deletion activity
-        await logUserActivity(userId, 'user_deleted', {
-            email: user.email,
-            name: user.name,
-            stripeCustomerId: user.stripeCustomerId || 'none',
-            deletedAt: new Date().toISOString()
-        });
-
-        console.log(`✅ Successfully deleted user ${userId}`);
-
-        return {
-            success: true,
-            deletedUser: {
-                _id: user._id.toString(),
-                name: user.name,
-                email: user.email,
-                stripeCustomerId: user.stripeCustomerId,
-                credits: user.credits,
-                totalCreditsEverPurchased: user.totalCreditsEverPurchased,
-                createdAt: user.createdAt,
-                updatedAt: user.updatedAt,
-                lastPurchaseAt: user.lastPurchaseAt,
-                status: user.status
-            },
-            deletedStripeCustomer: stripeDeleted
-        };
-
-    } catch (error) {
-        console.error('❌ Error deleting user:', error);
-        return {
-            success: false,
-            error: `Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`
-        };
-    }
-}
 
 // Analytics helper functions
 export async function logUserActivity(userId: string, activity: string, metadata?: any): Promise<void> {
