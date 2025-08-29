@@ -21,23 +21,21 @@ export async function createOrUpdateUser(data: {
         const db = DatabaseService.getInstance();
         const usersCollection = await db.getCollection('users');
 
-        // Find existing user
         let existingUser = null;
 
-        if (data.userId) {
+        existingUser = await usersCollection.findOne({ email: data.email });
+
+        if (!existingUser && data.userId) {
             try {
                 existingUser = await usersCollection.findOne({ _id: new ObjectId(data.userId) });
             } catch (error) {
-                console.log('Invalid ObjectId provided, searching by email instead');
+                console.log('Invalid ObjectId provided');
             }
         }
 
-        if (!existingUser) {
-            existingUser = await usersCollection.findOne({ email: data.email });
-        }
-
         if (existingUser) {
-            const updatedUser = await usersCollection.findOneAndUpdate(
+            console.log(`Found existing user: ${existingUser._id} for email: ${data.email}`);
+            const updatedResult = await usersCollection.updateOne(
                 { _id: existingUser._id },
                 {
                     $set: {
@@ -45,49 +43,54 @@ export async function createOrUpdateUser(data: {
                         email: data.email,
                         updatedAt: new Date()
                     }
-                },
-                { returnDocument: 'after' }
+                }
             );
 
-            if (updatedUser?.value) {
-                console.log(`Updated existing user: ${updatedUser.value._id}`);
-                
-                const user: UserAccount = {
-                    _id: updatedUser.value._id.toString(),
-                    name: updatedUser.value.name,
-                    email: updatedUser.value.email,
-                    stripeCustomerId: updatedUser.value.stripeCustomerId,
-                    credits: updatedUser.value.credits,
-                    totalCreditsEverPurchased: updatedUser.value.totalCreditsEverPurchased,
-                    createdAt: updatedUser.value.createdAt,
-                    updatedAt: updatedUser.value.updatedAt,
-                    lastPurchaseAt: updatedUser.value.lastPurchaseAt,
-                    status: updatedUser.value.status
-                };
+            const updatedUser = await usersCollection.findOne({ _id: existingUser._id });
 
-                // Update Stripe customer if needed and no existing Stripe customer
-                if (!user.stripeCustomerId) {
-                    const stripeCustomerId = await createStripeCustomer(user, data.address);
-                    if (stripeCustomerId) {
-                        await usersCollection.updateOne(
-                            { _id: updatedUser.value._id },
-                            { $set: { stripeCustomerId } }
-                        );
-                        user.stripeCustomerId = stripeCustomerId;
-                    }
-                }
-
-                await logUserActivity(user._id!, 'user_updated', {
-                    email: data.email,
-                    name: data.name,
-                    hasStripeCustomer: !!user.stripeCustomerId
-                });
-
-                return user;
+            if (!updatedUser) {
+                throw new Error('Failed to retrieve updated user');
             }
+            
+            
+            const user: UserAccount = {
+                _id: updatedUser._id.toString(),
+                name: updatedUser.name,
+                email: updatedUser.email,
+                stripeCustomerId: updatedUser.stripeCustomerId,
+                credits: updatedUser.credits,
+                totalCreditsEverPurchased: updatedUser.totalCreditsEverPurchased,
+                createdAt: updatedUser.createdAt,
+                updatedAt: updatedUser.updatedAt,
+                lastPurchaseAt: updatedUser.lastPurchaseAt,
+                status: updatedUser.status 
+            };
+
+            // Update Stripe customer if needed and no existing Stripe customer
+            if (!user.stripeCustomerId) {
+                console.log(`Creating Stripe customer for existing user: ${user._id}`);
+                const stripeCustomerId = await createStripeCustomer(user, data.address);
+                if (stripeCustomerId) {
+                    await usersCollection.updateOne(
+                        { _id: updatedUser._id },
+                        { $set: { stripeCustomerId } }
+                    );
+                    user.stripeCustomerId = stripeCustomerId;
+                }
+            }
+
+            await logUserActivity(user._id!, 'user_updated', {
+                email: data.email,
+                name: data.name,
+                hasStripeCustomer: !!user.stripeCustomerId
+            });
+
+            return user;
         }
 
-        // Create new user
+        // CREATE NEW USER (only if no user found by email)
+        console.log(`✨ Creating NEW user for email: ${data.email}`);
+        
         const newUser = {
             name: data.name,
             email: data.email,
@@ -103,13 +106,15 @@ export async function createOrUpdateUser(data: {
         const result = await usersCollection.insertOne(newUser);
         const userId = result.insertedId.toString();
 
+        console.log(`Inserted new user with MongoDB ID: ${userId}`);
+
         // Create Stripe customer with the new MongoDB _id
         const userForStripe: UserAccount = {
             _id: userId,
             ...newUser
         };
 
-        console.log('Creating Stripe customer for new user:', userForStripe);
+        console.log('🔄 Creating Stripe customer for new user:', userForStripe);
 
         const stripeCustomerId = await createStripeCustomer(userForStripe, data.address);
         if (stripeCustomerId) {
@@ -118,20 +123,21 @@ export async function createOrUpdateUser(data: {
                 { $set: { stripeCustomerId } }
             );
             userForStripe.stripeCustomerId = stripeCustomerId;
+            console.log(`Updated new user with Stripe customer ID: ${stripeCustomerId}`);
         }
 
-        console.log(`✨ Created new user with MongoDB ID: ${userId}`);
-        
         await logUserActivity(userId, 'user_created', {
             email: data.email,
             name: data.name,
             hasStripeCustomer: !!stripeCustomerId
         });
 
+        console.log(`Successfully created new user: ${userId}`);
         return userForStripe;
+
     } catch (error) {
         console.error('Failed to create or update user:', error);
-        throw null;
+        throw new Error(`Failed to create or update user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
 
