@@ -5,8 +5,7 @@ import * as path from 'path';
 import { ttsRoutes } from './routes/tts';
 import { stripeRoutes } from './routes/stripe';
 import { userRoutes } from './routes/user';
-import { TTSFactory } from './Factories/TTSFactory';
-import { MongoAnalyticsLogger } from './Utilities/AnalyticsLogger';
+import ElevenLabsService from './services/elevenLabsService';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
@@ -153,12 +152,8 @@ app.use('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 API Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🎙️  TTS API: http://localhost:${PORT}/api/tts`);
-  console.log(`🔊 TTS V1 API: http://localhost:${PORT}/api/v1/tts`);
-  console.log(`🎤 Voices API: http://localhost:${PORT}/api/v1/voices`);
-  console.log(`📈 Analytics API: http://localhost:${PORT}/api/v1/analytics`);
-});
+  console.log(`🚀 API Server running on port ${PORT}`)
+  console.log(`📊 Health check: http://localhost:${PORT}/health`)
+})
 
 export default app;
