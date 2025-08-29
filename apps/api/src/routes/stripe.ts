@@ -1,9 +1,11 @@
 
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, response } from 'express';
 import { getUserByUserId, deleteUserAndStripeCustomer } from '../services/userService';
-import { expireCheckoutSession, getStripeCustomers, createCheckoutSession, getPriceById } from '../services/stripeService';
+import { expireCheckoutSession, getStripeCustomers, createCheckoutSession, getPriceById, getStripeInstance, fulfillCheckout } from '../services/stripeService';
 
 const router: Router = Router();
+const bodyParser = require('body-parser');
+
 
 // ========== STRIPE ROUTES =================
 
@@ -86,6 +88,32 @@ router.delete('/customers/:customerId', async (req, res) => {
             error: 'Internal server error while deleting customer' 
         });
     }
+});
+
+// Webhook to handle Stripe events
+router.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
+  const stripe = getStripeInstance();
+  const sig = req.headers['stripe-signature'];
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+
+  try {
+    let event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+
+
+    switch (event.type) {
+      case event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded':
+        console.log(`Checkout session ${event.data.object.id} completed!`);
+        break;
+      case event.type === 'payment_intent.succeeded':
+        fulfillCheckout(event.data.object.id);
+        break;
+    }
+  
+    res.status(200).json({ received: true });
+  } catch (error) {
+    return res.status(400).send(`Webhook Error: ${error}`);
+  }
 });
 
 export { router as stripeRoutes };

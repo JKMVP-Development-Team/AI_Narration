@@ -113,15 +113,18 @@ export async function fulfillCheckout(sessionId: string): Promise<boolean> {
 
         const existingFulfillment = await fulfillmentCollection.findOne({ sessionId });
         
+        // Check if fulfillment already exists
         if (existingFulfillment) {
             console.log(`Fulfillment already processed for session ${sessionId}`);
             return false;
         }
 
+        // Retrieve the session with expanded line items
         let session = await stripe.checkout.sessions.retrieve(sessionId, {
             expand: ['line_items', 'line_items.data.price.product'],
         });
 
+        // Only fulfill if the payment was successful
         if (session.payment_status !== 'unpaid') {
             const userId = session.metadata?.userId;
 
@@ -134,6 +137,7 @@ export async function fulfillCheckout(sessionId: string): Promise<boolean> {
             let totalCredits = 0;
             let totalAmount = 0;
 
+            // Calculate total credits and amount from line items
             if (session.line_items?.data) {
                 for (const lineItem of session.line_items.data) {
                     const price = lineItem.price;
@@ -153,6 +157,7 @@ export async function fulfillCheckout(sessionId: string): Promise<boolean> {
                 throw new Error('No credits to fulfill');
             }
 
+            // Record the fulfillment in the database
             const fulfillmentRecord = {
                 sessionId,
                 userId,
@@ -170,12 +175,14 @@ export async function fulfillCheckout(sessionId: string): Promise<boolean> {
 
             await fulfillmentCollection.insertOne(fulfillmentRecord);
 
+            // Add credits to the user's account
             const result = addCreditsToUser(userId, parseInt(session.metadata?.credits || '0'));
             
             if (!result) {
                 throw new Error('Failed to add credits to user');
             }
 
+            // Log user activity
             await logUserActivity(userId, 'credits_purchased', {
                 sessionId,
                 creditsAdded: totalCredits,
@@ -192,6 +199,7 @@ export async function fulfillCheckout(sessionId: string): Promise<boolean> {
     }
     return false;
 }
+
 export async function getProductById(productId: string): Promise<any | null> {
     try {
         const stripe = getStripeInstance();
