@@ -1,5 +1,5 @@
 import { MongoClient, Db, Collection } from 'mongodb'
-import { IAnalyticsLogger, SynthesisMetrics, UserUsageStats, TtsAnalyticsDocument, ErrorAnalyticsDocument, UserDailyUsageDocument } from '../../Interfaces'
+import { IAnalyticsLogger, SynthesisMetrics, UserUsageStats, TtsAnalyticsDocument, ErrorAnalyticsDocument, UserDailyUsageDocument } from '@shared/types/logger'
 import { DatabaseService } from '../services/databaseService'
 
 
