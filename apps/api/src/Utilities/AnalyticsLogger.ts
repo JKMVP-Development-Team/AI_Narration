@@ -1,7 +1,7 @@
 import { MongoClient, Db, Collection } from 'mongodb'
 import { IAnalyticsLogger, SynthesisMetrics, UserUsageStats, TtsAnalyticsDocument, ErrorAnalyticsDocument, UserDailyUsageDocument } from '../../Interfaces'
 import { AudioAnalyzer } from './AudioAnalyzer'
-
+import { DatabaseService } from '@api/services/databaseService'
 
 
 export class MongoAnalyticsLogger implements IAnalyticsLogger {
@@ -12,27 +12,21 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
   private userUsageCollection: Collection<UserDailyUsageDocument> | null = null
   private isConnected = false
 
-  constructor(
-    private readonly mongoUri: string,
-    private readonly databaseName: string
-  ) {
+  constructor() {
     this.connect()
-  } 
+  }
 
   private async connect(): Promise<void> {
     try {
-      this.client = new MongoClient(this.mongoUri)
-      await this.client.connect()
-      
-      this.db = this.client.db(this.databaseName)
-      this.analyticsCollection = this.db.collection<TtsAnalyticsDocument>('tts_analytics')
-      this.errorCollection = this.db.collection<ErrorAnalyticsDocument>('tts_errors')
-      this.userUsageCollection = this.db.collection<UserDailyUsageDocument>('user_daily_usage')
+      const db = DatabaseService.getInstance()
+      this.analyticsCollection = await db.getCollection('tts_analytics')
+      this.errorCollection = await db.getCollection('tts_errors')
+      this.userUsageCollection = await db.getCollection('user_daily_usage')
       
       await this.createIndexes()
       
       this.isConnected = true
-      console.log(`✅ Connected to MongoDB analytics: ${this.databaseName}`)
+      console.log(`✅ Connected to MongoDB analytics`)
     } catch (error) {
       console.error('❌ Failed to connect to MongoDB:', error)
       this.isConnected = false

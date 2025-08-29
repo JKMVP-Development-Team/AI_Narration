@@ -85,7 +85,7 @@ app.get('/api/v1/voices/:id', async (req, res) => {
 app.get('/api/v1/analytics/user/:userId/daily/:date', async (req, res) => {
   try {
     const { userId, date } = req.params;
-    const analytics = new MongoAnalyticsLogger(process.env.MONGODB_URI!, process.env.MONGODB_DATABASE!);
+    const analytics = new MongoAnalyticsLogger();
     const stats = await analytics.getUserDailyStats(userId, date);
     res.json(stats);
   } catch (error) {
@@ -97,7 +97,7 @@ app.get('/api/v1/analytics/user/:userId/summary', async (req, res) => {
   try {
     const { userId } = req.params;
     const days = req.query.days ? Number(req.query.days) : 30;
-    const analytics = new MongoAnalyticsLogger(process.env.MONGODB_URI!, process.env.MONGODB_DATABASE!);
+    const analytics = new MongoAnalyticsLogger();
     const summary = await analytics.getUserUsageSummary(userId, days);
     res.json(summary);
   } catch (error) {
@@ -109,7 +109,7 @@ app.get('/api/v1/analytics/users/top', async (req, res) => {
   try {
     const days = req.query.days ? Number(req.query.days) : 30;
     const limit = req.query.limit ? Number(req.query.limit) : 10;
-    const analytics = new MongoAnalyticsLogger(process.env.MONGODB_URI!, process.env.MONGODB_DATABASE!);
+    const analytics = new MongoAnalyticsLogger();
     const topUsers = await analytics.getTopUsers(days, limit);
     res.json(topUsers);
   } catch (error) {
@@ -136,7 +136,7 @@ app.post('/create-checkout-session', async (req, res) => {
       
       if (existingCustomers.data.length > 0) {
         customer = existingCustomers.data[0];
-        console.log(`🔍 Found existing customer: ${customer.id}`);
+        console.log(`Found existing customer: ${customer.id}`);
       } else {
         // Create new customer
         customer = await stripe.customers.create({
@@ -146,7 +146,7 @@ app.post('/create-checkout-session', async (req, res) => {
             source: 'ai_narration_app'
           }
         });
-        console.log(`✨ Created new customer: ${customer.id}`);
+        console.log(`Created new customer: ${customer.id}`);
       }
     }
 
@@ -201,7 +201,7 @@ app.post('/create-checkout-session', async (req, res) => {
         customerId: customer?.id
       });
     }
-    
+
     // For form submissions, redirect
     res.redirect(303, session.url);
   } catch (error: any) {
