@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import './App.css';
+import React, { useState } from "react";
+import "./App.css";
 
 // Voice preset data structure
 interface VoicePreset {
@@ -13,10 +13,25 @@ interface VoicePreset {
 
 function App() {
   // State for text input and selected voice
-  const [text, setText] = useState('Welcome to the AI Narration App! This dark mode interface is designed for comfortable extended use. Enter your text and let our AI create beautiful narration for you.');
-  const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
+  const [text, setText] = useState(
+    "Welcome to the AI Narration App! This dark mode interface is designed for comfortable extended use. Enter your text and let our AI create beautiful narration for you."
+  );
+  const [selectedVoice, setSelectedVoice] = useState<string | null>("sarah");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(
+    null
+  );
 
-  // Voice presets data that is hardcoded for now
+  // Text limits configuration
+  const TEXT_LIMITS = {
+    max: 1000, // Max characters
+    min: 5, // Min characters for generation
+  };
+
+  // Character count
+  const characterCount = text.length;
+
+  // Voice presets data - hardcoded for now, will come from API later
   const voicePresets: VoicePreset[] = [
     {
       id: "sarah",
@@ -24,7 +39,8 @@ function App() {
       style: "Featured",
       gender: "Female",
       accent: "American",
-      description: "Clear, professional voice perfect for business presentations"
+      description:
+        "Clear, professional voice perfect for business presentations",
     },
     {
       id: "david",
@@ -32,7 +48,8 @@ function App() {
       style: "Professional",
       gender: "Male",
       accent: "British",
-      description: "Clear, professional voice perfect for business presentations"
+      description:
+        "Clear, professional voice perfect for business presentations",
     },
     {
       id: "maria",
@@ -40,7 +57,8 @@ function App() {
       style: "Conversation",
       gender: "Female",
       accent: "Spanish",
-      description: "Warm, friendly voice ideal for storytelling and casual content"
+      description:
+        "Warm, friendly voice ideal for storytelling and casual content",
     },
     {
       id: "james",
@@ -48,7 +66,7 @@ function App() {
       style: "Authoritative",
       gender: "Male",
       accent: "American",
-      description: "Strong, confident voice perfect for documentaries and news"
+      description: "Strong, confident voice perfect for documentaries and news",
     },
     {
       id: "emma",
@@ -56,7 +74,8 @@ function App() {
       style: "Soothing",
       gender: "Female",
       accent: "Australian",
-      description: "Calm, relaxing voice ideal for meditation and wellness content"
+      description:
+        "Calm, relaxing voice ideal for meditation and wellness content",
     },
     {
       id: "oliver",
@@ -64,40 +83,73 @@ function App() {
       style: "Educational",
       gender: "Male",
       accent: "Canadian",
-      description: "Clear, instructional voice perfect for tutorials and learning"
-    }
+      description:
+        "Clear, instructional voice perfect for tutorials and learning",
+    },
   ];
 
-  // Handlers for buttons
-  const handleGenerate = () => {
-    if (!selectedVoice) {
-      alert('Please select a voice first!');
-      return;
+  // Event Handlers
+
+  // Simple text change handler with character limit
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newText = e.target.value;
+
+    // Enforce maximum character limit
+    if (newText.length <= TEXT_LIMITS.max) {
+      setText(newText);
+    } else {
+      // Truncate text and show alert
+      setText(newText.substring(0, TEXT_LIMITS.max));
+      alert(`Text truncated to ${TEXT_LIMITS.max} characters maximum.`);
     }
-    // TODO: generation logic here
-    const selected = voicePresets.find(voice => voice.id === selectedVoice);
-    alert(`Generating narration with voice: ${selected?.name}`);
   };
 
+  // Generate narration
+  const handleGenerate = () => {
+    if (!selectedVoice) return alert("Select a voice first!");
+    if (!text.trim()) return alert("Enter some text!");
+    if (text.length < TEXT_LIMITS.min)
+      return alert(`Minimum ${TEXT_LIMITS.min} characters!`);
+
+    setIsGenerating(true);
+    // TODO: await fetch('/api/tts/speak')
+
+    setTimeout(() => {
+      setGeneratedAudioUrl("/mock.wav");
+      setIsGenerating(false);
+    }, 1000);
+  };
+
+  // Save audio
   const handleSave = () => {
-    // TODO: save logic here
-    alert('Audio saved successfully!');
+    if (!generatedAudioUrl) return alert("Generate audio first!");
+    // TODO: await fetch(generatedAudioUrl)
+    alert("Saved!");
   };
 
-  // clear text area
+  // Clear text
   const handleClear = () => {
-    setText('');
+    if (text.length > 50 && !confirm(`Clear ${text.length} characters?`))
+      return;
+    setText("");
+    setGeneratedAudioUrl(null);
   };
 
-  //TODO: Handle voice selection
+  // Select voice
   const handleVoiceSelect = (voiceId: string) => {
     setSelectedVoice(voiceId);
+    setGeneratedAudioUrl(null);
   };
 
-  // Handle voice preview
-  const handlePreview = (voiceName: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering the select event
-    alert(`Previewing voice: ${voiceName}`);
+  // Preview voice
+  const handlePreview = (
+    voiceId: string,
+    voiceName: string,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    // TODO: await fetch('/api/tts/speak')
+    alert(`${voiceName} preview`);
   };
 
   return (
@@ -105,24 +157,41 @@ function App() {
     <div className="container">
       <header>
         <h1>AI Narration Studio</h1>
-        <p className="subtitle">Transform your text into natural sounding audio with AI-powered narration</p>
+        <p className="subtitle">
+          Transform your text into natural sounding audio with AI-powered
+          narration
+        </p>
       </header>
-      
+
       <div className="input-section">
-        <textarea 
+        <textarea
           placeholder="Enter text to narrate..."
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={handleTextChange}
         />
+
+        {/* Simple character count */}
+        <div className="character-count">
+          <span>
+            {characterCount} / {TEXT_LIMITS.max}
+          </span>
+        </div>
       </div>
 
       {/* Button Controls*/}
       <div className="controls">
-        <button className="primary-btn" onClick={handleGenerate}>
+        <button
+          className="primary-btn"
+          onClick={handleGenerate}
+          disabled={isGenerating}
+        >
           <i className="fas fa-play-circle"></i>
-          Generate Narration
+          {isGenerating ? "Generating..." : "Generate Narration"}
         </button>
-        <button className="secondary-btn" onClick={handleSave}>
+        <button
+          className="secondary-btn"
+          onClick={handleSave}
+        >
           <i className="fas fa-save"></i>
           Save Audio
         </button>
@@ -132,33 +201,48 @@ function App() {
         </button>
       </div>
 
+      {/* Audio Player - shows when audio is generated */}
+      {generatedAudioUrl && (
+        <div className="audio-player">
+          <h3>Generated Audio</h3>
+          <audio controls style={{ width: "100%", marginTop: "10px" }}>
+            <source src={generatedAudioUrl} type="audio/wav" />
+            Your browser does not support the audio element.
+          </audio>
+        </div>
+      )}
+
       {/* Voice Presets Section */}
       <div className="voice-presets">
         <h2>AI Voice Presets</h2>
-        <p className="subtitle">Choose from our collection of professional AI voices</p>
-        
+        <p className="subtitle">
+          Choose from our collection of professional AI voices
+        </p>
+
         <div className="presets-grid">
           {voicePresets.map((voice) => (
-            <div 
-              key={voice.id} 
-              className={`preset-card ${selectedVoice === voice.id ? 'selected' : ''}`}
+            <div
+              key={voice.id}
+              className={`preset-card ${
+                selectedVoice === voice.id ? "selected" : ""
+              }`}
               onClick={() => handleVoiceSelect(voice.id)}
             >
               <div className="preset-header">
                 <span className="preset-style">{voice.style}</span>
                 <div className="preset-actions">
-                  <button 
+                  <button
                     className="preview-btn"
-                    onClick={(e) => handlePreview(voice.name, e)}
+                    onClick={(e) => handlePreview(voice.id, voice.name, e)}
                   >
                     Preview
                   </button>
                   <button className="select-btn">
-                    {selectedVoice === voice.id ? 'Selected' : 'Select Voice'}
+                    {selectedVoice === voice.id ? "Selected" : "Select Voice"}
                   </button>
                 </div>
               </div>
-              
+
               <div className="preset-content">
                 <h3 className="preset-name">{voice.name}</h3>
                 <div className="preset-details">
