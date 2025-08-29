@@ -1,57 +1,25 @@
 
 import { Router, Request, Response } from 'express';
 import { getUserByUserId, deleteUserAndStripeCustomer } from '../services/userService';
-import { getStripeInstance, getStripeCustomers } from '../services/stripeService';
+import { expireCheckoutSession, getStripeCustomers, createCheckoutSession, getPriceById } from '../services/stripeService';
 
-const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:3000';
 const router: Router = Router();
 
 // ========== STRIPE ROUTES =================
 
+// You can only checkout out if you have an account (stripe customer ID)
 router.post('/create-checkout-session', async (req, res) => {
   try {
-    const stripe = getStripeInstance();
-    const { priceId, planName, userId, credits, customerEmail } = req.body;
-
+    const { priceId, userId} = req.body;
+    
     let user = await getUserByUserId(userId);
+    let price = await getPriceById(priceId);
 
-    const session = await stripe.checkout.sessions.create({
-      line_items: [
-        {
-          price: 'price_1S0vfk7ev7V2kfjiiZauwMJx', // $20 for 200 credits
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: `${FRONTEND}`,
-      cancel_url: `${FRONTEND}`,
-      // automatic_tax: { enabled: true }, // TODO Enable tax calculation once we have a valid address
-      customer_creation: customerEmail ? 'if_required' : 'always',
-      customer: user?.stripeCustomerId,
-      metadata: {
-        planName: planName || 'Credit Package',
-        userId: userId || 'anonymous',
-        credits: credits || '200',
-        purchaseType: 'credits'
-      },
-      allow_promotion_codes: true,
-      billing_address_collection: 'auto',
-      customer_update: user ? { name: user.name, email: user.email } : undefined,
-      invoice_creation: {
-        enabled: true,
-        invoice_data: {
-          description: `AI Narration Credits - ${planName || 'Credit Package'}`,
-          metadata: {
-            planName: planName || 'Credit Package',
-            userId: userId || 'anonymous',
-            credits: credits || '200',
-            purchaseType: 'credits'
-          }
-        }
-      }
-    });
+    if (!user) {
+        throw new Error('User not found');
+    }
 
-    console.log("Checkout Session Created:", session.id);
+    let session = await createCheckoutSession(user, price);
 
     // For API calls, return JSON
     if (req.headers.accept?.includes('application/json')) {
@@ -78,6 +46,18 @@ router.get('/customers', async (req, res) => {
   } catch (error) {
     console.error('Error fetching Stripe customers:', error); 
     res.status(500).json({ success: false, error: 'Failed to fetch Stripe customers' });
+  }
+});
+
+router.post('/expire-checkout-session', async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    const expiredSession = await expireCheckoutSession(sessionId);
+    
+    res.json({ success: true, expiredSession });
+  } catch (error) {
+    console.error('Error expiring checkout session:', error);
+    res.status(500).json({ success: false, error: 'Failed to expire checkout session' });
   }
 });
 
