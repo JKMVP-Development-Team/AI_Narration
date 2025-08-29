@@ -3,7 +3,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import * as path from 'path';
 import { ttsRoutes } from './routes/tts';
-import ElevenLabsService from './services/elevenLabsService';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
