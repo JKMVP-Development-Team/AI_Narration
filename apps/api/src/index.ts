@@ -10,7 +10,7 @@ import { MongoAnalyticsLogger } from './Utilities/AnalyticsLogger';
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
 
 const stripe = require('stripe')(process.env.STRIPE_API_KEY);
-const app = express();
+const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
 const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:3000';
 

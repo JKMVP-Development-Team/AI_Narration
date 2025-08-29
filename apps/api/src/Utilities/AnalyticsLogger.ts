@@ -1,15 +1,14 @@
 import { MongoClient, Db, Collection } from 'mongodb'
 import { IAnalyticsLogger, SynthesisMetrics, UserUsageStats, TtsAnalyticsDocument, ErrorAnalyticsDocument, UserDailyUsageDocument } from '../../Interfaces'
-import { AudioAnalyzer } from './AudioAnalyzer'
-import { DatabaseService } from '@api/services/databaseService'
+import { DatabaseService } from '../services/databaseService'
 
 
 export class MongoAnalyticsLogger implements IAnalyticsLogger {
   private client: MongoClient | null = null
   private db: Db | null = null
-  private analyticsCollection: Collection<TtsAnalyticsDocument> | null = null
-  private errorCollection: Collection<ErrorAnalyticsDocument> | null = null
-  private userUsageCollection: Collection<UserDailyUsageDocument> | null = null
+  private analyticsCollection: Collection | null = null
+  private errorCollection: Collection | null = null
+  private userUsageCollection: Collection | null = null
   private isConnected = false
 
   constructor() {
@@ -82,7 +81,8 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
         success: true
       }
 
-      await this.analyticsCollection.insertOne(document)
+      const { _id, ...documentToInsert } = document
+      await this.analyticsCollection.insertOne(documentToInsert)
 
       await this.updateUserUsage(metrics.userId, metrics)
 
@@ -110,7 +110,8 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
         service: this.determineService(context)
       }
 
-      await this.errorCollection.insertOne(document)
+      const { _id, ...documentToInsert } = document
+      await this.errorCollection.insertOne(documentToInsert)
     } catch (mongoError) {
       console.error('Failed to save error to MongoDB:', mongoError)
     }
@@ -121,7 +122,7 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
     if (!this.userUsageCollection) return null
 
     try {
-      const document = await this.userUsageCollection.findOne({ userId, date })
+      const document = await this.userUsageCollection.findOne({ userId, date }) as UserDailyUsageDocument | null
       return document ? this.mapToUserUsageStats(document) : null
     } catch (error) {
       console.error('Failed to get user daily stats:', error)
@@ -144,7 +145,7 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
         .sort({ date: 1 })
         .toArray()
 
-      return documents.map(this.mapToUserUsageStats)
+      return documents.map(doc => this.mapToUserUsageStats(doc as unknown as UserDailyUsageDocument))
     } catch (error) {
       console.error('Failed to get user monthly stats:', error)
       return []

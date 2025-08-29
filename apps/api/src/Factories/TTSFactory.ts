@@ -14,7 +14,7 @@ export class TTSFactory {
     const textValidator = new TTSTextValidator(textLimits.maxLength, textLimits.warningLength)
     
     const mongoConfig = config.getMongoConfig()
-    const analyticsLogger = new MongoAnalyticsLogger(mongoConfig.uri, mongoConfig.database)
+    const analyticsLogger = new MongoAnalyticsLogger()
     
     return new ElevenLabsTTS(httpClient, config, textValidator, analyticsLogger)
   }
