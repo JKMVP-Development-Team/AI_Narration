@@ -5,141 +5,191 @@ import {
     UserAddress
 } from '@shared/types/user';
 
+import { ObjectId } from 'mongodb';
 import { DatabaseService } from './databaseService';
+import { getStripeInstance, createStripeCustomer, deleteStripeCustomer } from './stripeService';
 
-const stripe = require('stripe')(process.env.STRIPE_API_KEY);
 
 export async function createOrUpdateUser(data: {
-    userId: string;
+    userId?: string;
     name: string;
     email: string;
-    address: string;
+    address: UserAddress;
     stripeCustomerId?: string;
 }): Promise<UserAccount> {
-    const db = DatabaseService.getInstance();
-    const usersCollection = await db.getCollection('users');
-
-    // Find existing user
-    const existingUser = await usersCollection.findOne({ userId: data.userId });
-
-
-    // Create a UserAccount object
-    const user: UserAccount = {
-        userId: data.userId,
-        name: data.name,
-        email: data.email,
-        stripeCustomerId: data.stripeCustomerId || existingUser?.stripeCustomerId || '',
-        credits: existingUser?.credits || 0,
-        totalCreditsEverPurchased: existingUser?.totalCreditsEverPurchased || 0,
-        createdAt: existingUser?.createdAt || new Date(),
-        updatedAt: new Date(),
-        lastPurchaseAt: existingUser?.lastPurchaseAt,
-        status: 'active'
-    };
-
-    // TODO Parse location into UserAddress
-    const location: UserAddress = {
-        city: '',
-        country: '',
-        line1: '',
-        postal_code: '',
-        state: ''
-    };
-
-
-    // Create Stripe customer if not exists
-    if (!user.stripeCustomerId) {
-        const stripeCustomerId = await createStripeCustomer(user, location);
-        if (stripeCustomerId) {
-            user.stripeCustomerId = stripeCustomerId;
-        }
-    }
-
-    await usersCollection.updateOne(
-        { userId: data.userId },
-        { $set: user },
-        { upsert: true }
-    );
-
-    console.log(`User account updated in MongoDB: ${data.userId}`);
-    return user;
-}
-
-export async function createStripeCustomer(user: UserAccount, location: UserAddress): Promise<string | null> {
     try {
-        if (user.stripeCustomerId) {
-            const existingCustomer = await stripe.customers.retrieve(user.stripeCustomerId);
+        const db = DatabaseService.getInstance();
+        const usersCollection = await db.getCollection('users');
 
-            if (!existingCustomer.deleted) {
-                console.log(`Stripe customer already exists: ${user.stripeCustomerId}`);
-                return user.stripeCustomerId;
+        // Find existing user
+        let existingUser = null;
+
+        if (data.userId) {
+            try {
+                existingUser = await usersCollection.findOne({ _id: new ObjectId(data.userId) });
+            } catch (error) {
+                console.log('Invalid ObjectId provided, searching by email instead');
             }
         }
 
-        // TODO Text Validation
-        const customer = await stripe.customers.create({
-            name: user.name,
-            email: user.email,
-            address: {
-                city: location.city,
-                country: location.country,
-                line1: location.line1,
-                line2: location.line2 || '',
-                postal_code: location.postal_code,
-                state: location.state,
-            },
-            metadata: {
-                userId: user.userId,
-                appCustomerId: user.userId,
-                createdAt: user.createdAt.toISOString(),
+        if (!existingUser) {
+            existingUser = await usersCollection.findOne({ email: data.email });
+        }
+
+        if (existingUser) {
+            const updatedUser = await usersCollection.findOneAndUpdate(
+                { _id: existingUser._id },
+                {
+                    $set: {
+                        name: data.name,
+                        email: data.email,
+                        updatedAt: new Date()
+                    }
+                },
+                { returnDocument: 'after' }
+            );
+
+            if (updatedUser?.value) {
+                console.log(`Updated existing user: ${updatedUser.value._id}`);
+                
+                const user: UserAccount = {
+                    _id: updatedUser.value._id.toString(),
+                    name: updatedUser.value.name,
+                    email: updatedUser.value.email,
+                    stripeCustomerId: updatedUser.value.stripeCustomerId,
+                    credits: updatedUser.value.credits,
+                    totalCreditsEverPurchased: updatedUser.value.totalCreditsEverPurchased,
+                    createdAt: updatedUser.value.createdAt,
+                    updatedAt: updatedUser.value.updatedAt,
+                    lastPurchaseAt: updatedUser.value.lastPurchaseAt,
+                    status: updatedUser.value.status
+                };
+
+                // Update Stripe customer if needed and no existing Stripe customer
+                if (!user.stripeCustomerId) {
+                    const stripeCustomerId = await createStripeCustomer(user, data.address);
+                    if (stripeCustomerId) {
+                        await usersCollection.updateOne(
+                            { _id: updatedUser.value._id },
+                            { $set: { stripeCustomerId } }
+                        );
+                        user.stripeCustomerId = stripeCustomerId;
+                    }
+                }
+
+                await logUserActivity(user._id!, 'user_updated', {
+                    email: data.email,
+                    name: data.name,
+                    hasStripeCustomer: !!user.stripeCustomerId
+                });
+
+                return user;
             }
-        })
-        console.log(`Created new Stripe customer: ${customer.id}`);
-        return customer.id;
+        }
+
+        // Create new user
+        const newUser = {
+            name: data.name,
+            email: data.email,
+            stripeCustomerId: '',
+            credits: 0,
+            totalCreditsEverPurchased: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            lastPurchaseAt: undefined,
+            status: 'active' as const
+        };
+
+        const result = await usersCollection.insertOne(newUser);
+        const userId = result.insertedId.toString();
+
+        // Create Stripe customer with the new MongoDB _id
+        const userForStripe: UserAccount = {
+            _id: userId,
+            ...newUser
+        };
+
+        console.log('Creating Stripe customer for new user:', userForStripe);
+
+        const stripeCustomerId = await createStripeCustomer(userForStripe, data.address);
+        if (stripeCustomerId) {
+            await usersCollection.updateOne(
+                { _id: result.insertedId },
+                { $set: { stripeCustomerId } }
+            );
+            userForStripe.stripeCustomerId = stripeCustomerId;
+        }
+
+        console.log(`✨ Created new user with MongoDB ID: ${userId}`);
+        
+        await logUserActivity(userId, 'user_created', {
+            email: data.email,
+            name: data.name,
+            hasStripeCustomer: !!stripeCustomerId
+        });
+
+        return userForStripe;
     } catch (error) {
-        console.error('Failed to create Stripe customer:', error);
-        return null;
+        console.error('Failed to create or update user:', error);
+        throw null;
     }
 }
+
 
 export async function addCreditsToUser(userId: string, credits: number): Promise<UserAccount | null> {
-    const db = DatabaseService.getInstance();
-    const usersCollection = await db.getCollection('users');
+    try {
+        const db = DatabaseService.getInstance();
+        const usersCollection = await db.getCollection('users');
 
-    const user = await usersCollection.findOne({ userId });
-    if (!user) {
-        console.error(`User not found: ${userId}`);
-        return null;
-    }
+        const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+        if (!user) {
+            console.error(`User not found: ${userId}`);
+            return null;
+        }
 
-    const updatedUser = await usersCollection.findOneAndUpdate(
-        { userId },
-        {
-            $inc: {
-                credits: credits,
-                totalCreditsEverPurchased: credits
+        const updatedUser = await usersCollection.findOneAndUpdate(
+            { _id: new ObjectId(userId) },
+            {
+                $inc: {
+                    credits: credits,
+                    totalCreditsEverPurchased: credits
+                },
+                $set: {
+                    lastPurchaseAt: new Date(),
+                    updatedAt: new Date()
+                }
             },
-            $set: {
-                lastPurchaseAt: new Date(),
-                updatedAt: new Date()
-            }
-        },
-        { returnDocument: 'after' }
-    );
+            { returnDocument: 'after' }
+        );
 
-    if (!updatedUser || !updatedUser.value) {
-        console.error(`Failed to update user credits for user ${userId}.`);
+        if (!updatedUser || !updatedUser.value) {
+            console.error(`Failed to update user credits for user ${userId}.`);
+            return null;
+        }
+
+        console.log(`Added ${credits} credits to user ${userId}. New balance: ${updatedUser.value?.credits}`);
+        return {
+            _id: updatedUser.value._id.toString(),
+            name: updatedUser.value.name,
+            email: updatedUser.value.email,
+            stripeCustomerId: updatedUser.value.stripeCustomerId,
+            credits: updatedUser.value.credits,
+            totalCreditsEverPurchased: updatedUser.value.totalCreditsEverPurchased,
+            createdAt: updatedUser.value.createdAt,
+            updatedAt: updatedUser.value.updatedAt,
+            lastPurchaseAt: updatedUser.value.lastPurchaseAt,
+            status: updatedUser.value.status
+        };
+    } catch (error) {
+        console.error('Failed to add credits to user:', error);
         return null;
     }
-
-    console.log(`Added ${credits} credits to user ${userId}. New balance: ${updatedUser.value?.credits}`);
-    return updatedUser.value as UserAccount;
 }
 
 export async function deductCreditsFromUser(userId: string, credits: number): Promise<UserAccount | null> {
     const db = DatabaseService.getInstance();
     const usersCollection = await db.getCollection('users');
-    const user = await usersCollection.findOne({ userId });
+    const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
     if (!user) {
         console.error(`User not found: ${userId}`);
         return null;
@@ -151,7 +201,7 @@ export async function deductCreditsFromUser(userId: string, credits: number): Pr
     }
 
     const updatedUser = await usersCollection.findOneAndUpdate(
-        { userId },
+        {  _id: new ObjectId(userId) },
         {
             $inc: { credits: -credits },
             $set: { updatedAt: new Date() }
@@ -172,12 +222,12 @@ export async function getUserByUserId(userId: string): Promise<UserAccount | nul
     const db = DatabaseService.getInstance();
     const usersCollection = await db.getCollection('users');
 
-    const user = await usersCollection.findOne({ userId });
+    const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
 
     if (!user) return null;
 
     const mappedUser: UserAccount = {
-        userId: user.userId,
+        _id: user._id.toString(),
         name: user.name,
         email: user.email,
         stripeCustomerId: user.stripeCustomerId,
@@ -198,7 +248,7 @@ export async function updateUserStatus(userId: string, status: 'active' | 'inact
     const usersCollection = await db.getCollection('users');
 
     const updatedUser = await usersCollection.findOneAndUpdate(
-        { userId },
+        {  _id: new ObjectId(userId) },
         {
             $set: {
                 status,
@@ -228,11 +278,11 @@ export async function getUserStats(userId: string): Promise<{
     const purchasesCollection = await db.getCollection('creditPurchases');
     const usersCollection = await db.getCollection('users');
 
-    const user = await usersCollection.findOne({ userId });
+    const user = await usersCollection.findOne({  _id: new ObjectId(userId) });
     if (!user) return null;
 
     const purchases = await purchasesCollection
-        .find({ userId, status: 'completed' })
+        .find({ userId: userId, status: 'completed' }) 
         .toArray();
 
     const totalPurchases = purchases.length;
@@ -246,6 +296,158 @@ export async function getUserStats(userId: string): Promise<{
         totalCreditsUsed,
         averagePurchaseAmount
     };
+}
+
+export async function deleteUserAndStripeCustomer(customerId: string): Promise<{
+    success: boolean;
+    deletedUser?: UserAccount;
+    deletedStripeCustomer?: boolean;
+    error?: string;
+}> {
+    try {
+        const db = DatabaseService.getInstance();
+        const usersCollection = await db.getCollection('users');
+
+        // 1. Find the user first
+        const user = await usersCollection.findOne({ stripeCustomerId: customerId });
+        if (!user) {
+            return {
+                success: false,
+                error: 'User not found with this Stripe customer ID'
+            };
+        }
+
+        console.log(`🗑️ Deleting user ${user._id} and Stripe customer ${customerId}`);
+
+        // 2. Delete from Stripe first (external service)
+        const stripeDeleted = await deleteStripeCustomer(customerId);
+        if (!stripeDeleted) {
+            return {
+                success: false,
+                error: 'Failed to delete Stripe customer'
+            };
+        }
+
+        // 3. Delete from our database
+        const deleteResult = await usersCollection.deleteOne({ _id: user._id });
+        if (deleteResult.deletedCount === 0) {
+            console.error('⚠️ Stripe customer deleted but failed to delete user from database');
+            return {
+                success: false,
+                error: 'Failed to delete user from database (but Stripe customer was deleted)'
+            };
+        }
+
+        // 4. Log the deletion activity (if the user still existed)
+        await logUserActivity(user._id.toString(), 'user_deleted', {
+            email: user.email,
+            name: user.name,
+            stripeCustomerId: customerId,
+            deletedAt: new Date().toISOString()
+        });
+
+        console.log(`✅ Successfully deleted user ${user._id} and Stripe customer ${customerId}`);
+
+        return {
+            success: true,
+            deletedUser: {
+                _id: user._id.toString(),
+                name: user.name,
+                email: user.email,
+                stripeCustomerId: user.stripeCustomerId,
+                credits: user.credits,
+                totalCreditsEverPurchased: user.totalCreditsEverPurchased,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+                lastPurchaseAt: user.lastPurchaseAt,
+                status: user.status
+            },
+            deletedStripeCustomer: true
+        };
+
+    } catch (error) {
+        console.error('❌ Error deleting user and Stripe customer:', error);
+        return {
+            success: false,
+            error: `Failed to delete user and customer: ${error instanceof Error ? error.message : 'Unknown error'}`
+        };
+    }
+}
+
+export async function deleteUserByUserId(userId: string): Promise<{
+    success: boolean;
+    deletedUser?: UserAccount;
+    deletedStripeCustomer?: boolean;
+    error?: string;
+}> {
+    try {
+        const db = DatabaseService.getInstance();
+        const usersCollection = await db.getCollection('users');
+
+        // 1. Find the user first
+        const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+        if (!user) {
+            return {
+                success: false,
+                error: 'User not found'
+            };
+        }
+
+        console.log(`🗑️ Deleting user ${userId} and Stripe customer ${user.stripeCustomerId}`);
+
+        let stripeDeleted = true;
+        
+        // 2. Delete from Stripe if customer exists
+        if (user.stripeCustomerId) {
+            stripeDeleted = await deleteStripeCustomer(user.stripeCustomerId);
+            if (!stripeDeleted) {
+                console.warn('Failed to delete Stripe customer, continuing with user deletion');
+            }
+        }
+
+        // 3. Delete from our database
+        const deleteResult = await usersCollection.deleteOne({ _id: user._id });
+        if (deleteResult.deletedCount === 0) {
+            return {
+                success: false,
+                error: 'Failed to delete user from database'
+            };
+        }
+
+        // 4. Log the deletion activity
+        await logUserActivity(userId, 'user_deleted', {
+            email: user.email,
+            name: user.name,
+            stripeCustomerId: user.stripeCustomerId || 'none',
+            deletedAt: new Date().toISOString()
+        });
+
+        console.log(`✅ Successfully deleted user ${userId}`);
+
+        return {
+            success: true,
+            deletedUser: {
+                _id: user._id.toString(),
+                name: user.name,
+                email: user.email,
+                stripeCustomerId: user.stripeCustomerId,
+                credits: user.credits,
+                totalCreditsEverPurchased: user.totalCreditsEverPurchased,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+                lastPurchaseAt: user.lastPurchaseAt,
+                status: user.status
+            },
+            deletedStripeCustomer: stripeDeleted
+        };
+
+    } catch (error) {
+        console.error('❌ Error deleting user:', error);
+        return {
+            success: false,
+            error: `Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`
+        };
+    }
 }
 
 // Analytics helper functions
@@ -284,6 +486,8 @@ export async function getActiveUsersCount(days: number = 30): Promise<number> {
 
 export async function getStripeCustomerTransactions(customerId: string, limit: number = 10): Promise<any[]> {
     try {
+        const stripe = getStripeInstance();
+
         const charges = await stripe.charges.list({
             customer: customerId,
             limit: limit,

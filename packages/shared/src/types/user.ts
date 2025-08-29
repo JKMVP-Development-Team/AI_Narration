@@ -1,6 +1,6 @@
 
 export interface UserAccount {
-    userId: string;
+    _id?: string;
     name: string;
     email: string;
     stripeCustomerId: string;
@@ -21,14 +21,14 @@ export interface UserAddress {
     state: string;
 }
 export interface CreditPurchase {
-    purchaseId: string;
+    _id?: string;
     userId: string;
     stripeCustomerId: string;
     amount: number; // in cents
     credits: number;
     currency: string;
     stripeSessionId: string;
-    stripePaymentIntentId: string;
+    stripePaymentIntentId?: string;
     createdAt: Date;
     updatedAt: Date;
     status: 'pending' | 'completed' | 'failed' | 'refunded';
