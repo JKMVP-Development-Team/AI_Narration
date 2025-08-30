@@ -110,6 +110,7 @@ function App() {
           <i className="fas fa-microphone-alt"></i>
           <span>AI Narration Studio</span>
         </div>
+        {/* Navigation Button Controls*/}
         <ul className="nav-links">
           <li>
             <a 
@@ -130,12 +131,8 @@ function App() {
             </a>
           </li>
           <li>
-            <a 
-              href="#history" 
-              className={activeTab === 'history' ? 'active' : ''}
-              onClick={(e) => { e.preventDefault(); setActiveTab('history'); }}
-            >
-              <i className="fas fa-history"></i> History
+            <a href="/signup">
+              <i className="fas fa-user-plus"></i> Sign Up
             </a>
           </li>
           <li>

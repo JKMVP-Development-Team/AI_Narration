@@ -5,6 +5,7 @@ import App from './App'
 import LandingPage from "./LandingPage";
 import "./app.css";
 
+import Signup from './Signup'
 
 const root = ReactDOM.createRoot(document.getElementById("root") as HTMLElement);
 root.render(
@@ -13,6 +14,7 @@ root.render(
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/home" element={<App />} />
+        <Route path="/signup" element={<Signup />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
