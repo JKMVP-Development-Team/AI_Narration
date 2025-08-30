@@ -122,12 +122,8 @@ function App() {
             </a>
           </li>
           <li>
-            <a 
-              href="#voices" 
-              className={activeTab === 'voices' ? 'active' : ''}
-              onClick={(e) => { e.preventDefault(); setActiveTab('voices'); }}
-            >
-              <i className="fas fa-voicemail"></i> Voices
+            <a href="/history">
+              <i className="fas fa-history"></i> History
             </a>
           </li>
           <li>

@@ -53,6 +53,11 @@ const Signup: React.FC = () => {
               <i className="fas fa-sign-in-alt"></i> Login
             </a>
           </li>
+          <li>
+            <a href="/history">
+            <i className="fas fa-history"></i> History
+            </a>
+          </li>
         </ul>
       </nav>
 

@@ -511,3 +511,227 @@ button:active {
     font-size: 1.7rem;
   }
 }
+
+/* Credit History Styles */
+.credit-history-container {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.credit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.credit-header h2 {
+  background: linear-gradient(to right, #7b4397, #dc2430);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 2.2rem;
+}
+
+.credit-balance {
+  flex-shrink: 0;
+}
+
+.balance-card {
+  background: rgba(15, 17, 35, 0.8);
+  border: 1px solid #2d2f4e;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  min-width: 200px;
+}
+
+.balance-card h3 {
+  color: #a0a0c0;
+  font-size: 1rem;
+  margin-bottom: 10px;
+}
+
+.balance-amount {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #7b4397;
+  margin-bottom: 15px;
+}
+
+.history-section {
+  background: rgba(15, 17, 35, 0.8);
+  border: 1px solid #2d2f4e;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 25px;
+}
+
+.history-section h3 {
+  color: #e6e6e6;
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+}
+
+.history-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 8px 16px;
+  background: rgba(45, 47, 78, 0.5);
+  border: 1px solid #4a4c7a;
+  border-radius: 20px;
+  color: #b8b8d0;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.filter-btn:hover,
+.filter-btn.active {
+  background: rgba(123, 67, 151, 0.3);
+  color: #e6e6e6;
+  border-color: #7b4397;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.history-item {
+  background: rgba(26, 27, 44, 0.6);
+  border: 1px solid #2d2f4e;
+  border-radius: 8px;
+  padding: 15px;
+  transition: all 0.3s;
+}
+
+.history-item:hover {
+  border-color: #7b4397;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.item-title {
+  font-weight: 600;
+  color: #e6e6e6;
+  font-size: 1.1rem;
+}
+
+.item-date {
+  color: #a0a0c0;
+  font-size: 0.9rem;
+}
+
+.item-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.status-completed {
+  background: rgba(46, 204, 113, 0.2);
+  color: #2ecc71;
+  border: 1px solid #2ecc71;
+}
+
+.status-processing {
+  background: rgba(241, 196, 15, 0.2);
+  color: #f1c40f;
+  border: 1px solid #f1c40f;
+}
+
+.status-failed {
+  background: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+  border: 1px solid #e74c3c;
+}
+
+.credits-used {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+.credits-remaining {
+  color: #a0a0c0;
+  font-size: 0.9rem;
+}
+
+.credit-info {
+  background: rgba(15, 17, 35, 0.8);
+  border: 1px solid #2d2f4e;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.credit-info h4 {
+  color: #e6e6e6;
+  margin-bottom: 10px;
+  font-size: 1.2rem;
+}
+
+.credit-info p {
+  color: #a0a0c0;
+  line-height: 1.5;
+}
+
+/* Responsive adjustments for credit history */
+@media (max-width: 768px) {
+  .credit-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .item-main {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .item-details {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .history-filters {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .balance-card {
+    min-width: auto;
+    width: 100%;
+  }
+  
+  .history-section {
+    padding: 15px;
+  }
+}
