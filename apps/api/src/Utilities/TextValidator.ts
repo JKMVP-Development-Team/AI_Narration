@@ -1,4 +1,4 @@
-import { ITextValidator, ValidationResult } from '../../Interfaces'
+import { ITextValidator, ValidationResult } from '@shared/types/logger'
 
 export class TTSTextValidator implements ITextValidator {
   constructor(

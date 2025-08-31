@@ -1,38 +1,31 @@
 import { MongoClient, Db, Collection } from 'mongodb'
-import { IAnalyticsLogger, SynthesisMetrics, UserUsageStats, TtsAnalyticsDocument, ErrorAnalyticsDocument, UserDailyUsageDocument } from '../../Interfaces'
-import { AudioAnalyzer } from './AudioAnalyzer'
-
+import { IAnalyticsLogger, SynthesisMetrics, UserUsageStats, TtsAnalyticsDocument, ErrorAnalyticsDocument, UserDailyUsageDocument } from '@shared/types/logger'
+import { DatabaseService } from '../services/databaseService'
 
 
 export class MongoAnalyticsLogger implements IAnalyticsLogger {
   private client: MongoClient | null = null
   private db: Db | null = null
-  private analyticsCollection: Collection<TtsAnalyticsDocument> | null = null
-  private errorCollection: Collection<ErrorAnalyticsDocument> | null = null
-  private userUsageCollection: Collection<UserDailyUsageDocument> | null = null
+  private analyticsCollection: Collection | null = null
+  private errorCollection: Collection | null = null
+  private userUsageCollection: Collection | null = null
   private isConnected = false
 
-  constructor(
-    private readonly mongoUri: string,
-    private readonly databaseName: string
-  ) {
+  constructor() {
     this.connect()
-  } 
+  }
 
   private async connect(): Promise<void> {
     try {
-      this.client = new MongoClient(this.mongoUri)
-      await this.client.connect()
-      
-      this.db = this.client.db(this.databaseName)
-      this.analyticsCollection = this.db.collection<TtsAnalyticsDocument>('tts_analytics')
-      this.errorCollection = this.db.collection<ErrorAnalyticsDocument>('tts_errors')
-      this.userUsageCollection = this.db.collection<UserDailyUsageDocument>('user_daily_usage')
+      const db = DatabaseService.getInstance()
+      this.analyticsCollection = await db.getCollection('tts_analytics')
+      this.errorCollection = await db.getCollection('tts_errors')
+      this.userUsageCollection = await db.getCollection('user_daily_usage')
       
       await this.createIndexes()
       
       this.isConnected = true
-      console.log(`✅ Connected to MongoDB analytics: ${this.databaseName}`)
+      console.log(`✅ Connected to MongoDB analytics`)
     } catch (error) {
       console.error('❌ Failed to connect to MongoDB:', error)
       this.isConnected = false
@@ -88,7 +81,8 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
         success: true
       }
 
-      await this.analyticsCollection.insertOne(document)
+      const { _id, ...documentToInsert } = document
+      await this.analyticsCollection.insertOne(documentToInsert)
 
       await this.updateUserUsage(metrics.userId, metrics)
 
@@ -116,7 +110,8 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
         service: this.determineService(context)
       }
 
-      await this.errorCollection.insertOne(document)
+      const { _id, ...documentToInsert } = document
+      await this.errorCollection.insertOne(documentToInsert)
     } catch (mongoError) {
       console.error('Failed to save error to MongoDB:', mongoError)
     }
@@ -127,7 +122,7 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
     if (!this.userUsageCollection) return null
 
     try {
-      const document = await this.userUsageCollection.findOne({ userId, date })
+      const document = await this.userUsageCollection.findOne({ userId, date }) as UserDailyUsageDocument | null
       return document ? this.mapToUserUsageStats(document) : null
     } catch (error) {
       console.error('Failed to get user daily stats:', error)
@@ -150,7 +145,7 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
         .sort({ date: 1 })
         .toArray()
 
-      return documents.map(this.mapToUserUsageStats)
+      return documents.map(doc => this.mapToUserUsageStats(doc as unknown as UserDailyUsageDocument))
     } catch (error) {
       console.error('Failed to get user monthly stats:', error)
       return []

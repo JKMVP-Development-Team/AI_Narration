@@ -18,18 +18,21 @@
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.11.0",
     "@google-cloud/text-to-speech": "^5.0.0",
+    "axios": "^1.11.0",
     "concurrently": "^9.2.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "elevenlabs-node": "^1.0.0",
     "express": "^4.21.2",
     "ffmpeg-static": "^5.0.0",
-    "mongodb": "^6.18.0",
+    "mongodb": "^6.19.0",
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "openai": "^4.104.0",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^7.8.2"
+    "stripe": "^18.5.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.0",
