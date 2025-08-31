@@ -2,7 +2,6 @@
 import {
     UserAccount,
     CreditPurchase,
-    UserAddress
 } from '@shared/types/user';
 
 import { ObjectId } from 'mongodb';
@@ -14,7 +13,6 @@ export async function createOrUpdateUser(data: {
     userId?: string;
     name: string;
     email: string;
-    address: UserAddress;
     stripeCustomerId?: string;
 }): Promise<UserAccount> {
     try {
@@ -75,7 +73,7 @@ export async function createOrUpdateUser(data: {
 
             if (!stripeCustomer) {
                 console.log('No Stripe customer found, creating new one...');
-                const stripeCustomerId = await createStripeCustomer(user, data.address);
+                const stripeCustomerId = await createStripeCustomer(user);
                 if (stripeCustomerId) {
                     await usersCollection.updateOne(
                         { _id: updatedUser._id },
@@ -128,7 +126,7 @@ export async function createOrUpdateUser(data: {
 
         console.log('🔄 Creating Stripe customer for new user:', userForStripe);
 
-        const stripeCustomerId = await createStripeCustomer(userForStripe, data.address);
+        const stripeCustomerId = await createStripeCustomer(userForStripe);
         if (stripeCustomerId) {
             await usersCollection.updateOne(
                 { _id: result.insertedId },

@@ -22,6 +22,17 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(clerkMiddleware());
 
+
+const hasPermission = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const auth = getAuth(req);
+
+  if (!auth.has({ permission: 'org:admin:example'})) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  return next();
+};
+
 app.use('/webhooks', stripeWebhookRouter);
 
 app.use(express.json({ limit: '50mb' }));
@@ -29,9 +40,9 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Routes
 // To protect the routes, use the requireAuth middleware by redirecting users to sign in if they are not authenticated.
-app.use('/api/tts', requireAuth(), ttsRoutes);
-app.use('/api/stripe', requireAuth(), stripeRoutes);
-app.use('/api/user', requireAuth(), userRoutes);
+app.use('/api/tts', requireAuth(), hasPermission, ttsRoutes);
+app.use('/api/stripe', requireAuth(), hasPermission, stripeRoutes);
+app.use('/api/user', requireAuth(), hasPermission, userRoutes);
 
 // TODO Add requireAuth() for data analytics routes when ready
 

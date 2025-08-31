@@ -1,7 +1,6 @@
 import Stripe from 'stripe';
 import {
     UserAccount,
-    UserAddress
 } from '@shared/types/user';
 
 import { UsageEvent } from '@shared/types/meter';
@@ -57,7 +56,6 @@ export async function createCheckoutSession(
             mode: 'payment',
             success_url: `${FRONTEND}`, // TODO Add Success URL
             cancel_url: `${FRONTEND}`, // TODO Add Cancel URL
-            // automatic_tax: { enabled: true }, // TODO Enable tax Update Stripe Business Profile
             customer: user?.stripeCustomerId,
             metadata: {
                 planName: 'Credit Package',
@@ -67,11 +65,8 @@ export async function createCheckoutSession(
                 userEmail: user.email
             },
             allow_promotion_codes: true,
-            billing_address_collection: 'auto',
             customer_update: {
-                address: 'auto',
                 name: 'auto',
-                shipping: 'auto'
             },
             invoice_creation: {
                 enabled: true,
@@ -247,7 +242,7 @@ export async function getPriceById(priceId: string): Promise<any | null> {
     }
 }
 
-export async function createStripeCustomer(user: UserAccount, location: UserAddress): Promise<string | null> {
+export async function createStripeCustomer(user: UserAccount): Promise<string | null> {
     try {
         const stripe = getStripeInstance();
 
@@ -263,14 +258,6 @@ export async function createStripeCustomer(user: UserAccount, location: UserAddr
         const customer = await stripe.customers.create({
             name: user.name,
             email: user.email,
-            address: {
-                city: location.city,
-                country: location.country,
-                line1: location.line1,
-                line2: location.line2 || '',
-                postal_code: location.postal_code,
-                state: location.state,
-            },
             metadata: {
                 userId: user._id?.toString() || '',
                 createdAt: user.createdAt.toISOString(),

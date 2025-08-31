@@ -49,7 +49,4 @@ router.get('/:userId', async (req, res) => {
 });
 
 
-
-
-
 export { router as userRoutes };
