@@ -49,9 +49,6 @@ function App() {
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(
     null
   );
-
-  const [text, setText] = useState('Welcome to the AI Narration App! This dark mode interface is designed for comfortable extended use. Enter your text and let our AI create beautiful narration for you.');
-  const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('home'); // State for navigation
 
 
