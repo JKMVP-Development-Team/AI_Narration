@@ -1,39 +1,40 @@
-import { MongoClient, Db, Collection } from 'mongodb'
-import { IAnalyticsLogger, SynthesisMetrics, UserUsageStats, TtsAnalyticsDocument, ErrorAnalyticsDocument, UserDailyUsageDocument } from '@shared/types/logger'
+import { MongoClient, Collection } from 'mongodb'
+import { IAnalyticsLogger, SynthesisMetrics, UserUsageStats, UserDailyUsageDocument } from '@shared/types/logger'
 import { DatabaseService } from '../services/databaseService'
+import { ObjectId } from 'mongodb'
+import { UsageEvent } from '@shared/types/meter'
+import Stripe from 'stripe'
+import { getStripeInstance } from '../services/stripeService'
 
 
 export class MongoAnalyticsLogger implements IAnalyticsLogger {
   private client: MongoClient | null = null
-  private db: Db | null = null
   private analyticsCollection: Collection | null = null
-  private errorCollection: Collection | null = null
   private userUsageCollection: Collection | null = null
-  private isConnected = false
+  private stripe: Stripe;
 
   constructor() {
+    this.stripe = getStripeInstance();
     this.connect()
+
   }
 
   private async connect(): Promise<void> {
     try {
       const db = DatabaseService.getInstance()
       this.analyticsCollection = await db.getCollection('tts_analytics')
-      this.errorCollection = await db.getCollection('tts_errors')
       this.userUsageCollection = await db.getCollection('user_daily_usage')
       
       await this.createIndexes()
       
-      this.isConnected = true
       console.log(`✅ Connected to MongoDB analytics`)
     } catch (error) {
       console.error('❌ Failed to connect to MongoDB:', error)
-      this.isConnected = false
     }
   }
 
   private async createIndexes(): Promise<void> {
-    if (!this.analyticsCollection || !this.errorCollection || !this.userUsageCollection) return
+    if (!this.analyticsCollection || !this.userUsageCollection) return
 
     try {
       await this.analyticsCollection.createIndex({ userId: 1, timestamp: -1 })
@@ -41,9 +42,7 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
       await this.analyticsCollection.createIndex({ voiceId: 1 })
       await this.analyticsCollection.createIndex({ success: 1 })
 
-      await this.errorCollection.createIndex({ timestamp: -1 })
-      await this.errorCollection.createIndex({ userId: 1, timestamp: -1 })
-      await this.errorCollection.createIndex({ level: 1 })
+
 
       await this.userUsageCollection.createIndex({ userId: 1, date: -1 }, { unique: true })
       await this.userUsageCollection.createIndex({ date: -1 })
@@ -51,69 +50,6 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
       console.log('Analytics indexes created successfully')
     } catch (error) {
       console.warn('Failed to create analytics indexes:', error)
-    }
-  }
-
-  //============ Public Logging Methods =============
-  async logSynthesis(metrics: SynthesisMetrics): Promise<void> {
-    if (!this.isConnected || !this.analyticsCollection) {
-      console.warn('⚠️ MongoDB not connected, skipping analytics storage')
-      return
-    }
-
-    try {
-      const requestId = this.generateRequestId()
-      const audioLengthBytes = this.estimateAudioBytes(metrics.audioDurationSeconds)
-      const efficiencyRatio = this.calculateEfficiency(metrics.audioDurationSeconds, metrics.processingTimeMs)
-
-      const document: TtsAnalyticsDocument = {
-        userId: metrics.userId,
-        timestamp: metrics.timestamp,
-        charactersRequested: metrics.charactersRequested,
-        charactersProcessed: metrics.charactersProcessed,
-        audioDurationSeconds: metrics.audioDurationSeconds,
-        audioLengthBytes,
-        voiceId: metrics.voiceId,
-        modelId: metrics.modelId,
-        processingTimeMs: metrics.processingTimeMs,
-        efficiencyRatio,
-        requestId,
-        success: true
-      }
-
-      const { _id, ...documentToInsert } = document
-      await this.analyticsCollection.insertOne(documentToInsert)
-
-      await this.updateUserUsage(metrics.userId, metrics)
-
-      console.log(`TTS [${metrics.userId}]: ${metrics.charactersProcessed} chars → ${metrics.audioDurationSeconds.toFixed(2)}s audio (${metrics.processingTimeMs}ms)`)
-      
-    } catch (error) {
-      console.error('Failed to save analytics to MongoDB:', error)
-    }
-  }
-
-  async logError(error: string, context: any): Promise<void> {
-    console.error('TTS Error:', error, context)
-
-    if (!this.isConnected || !this.errorCollection) {
-      return
-    }
-
-    try {
-      const document: ErrorAnalyticsDocument = {
-        userId: context?.userId,
-        timestamp: new Date(),
-        error,
-        context,
-        level: 'error',
-        service: this.determineService(context)
-      }
-
-      const { _id, ...documentToInsert } = document
-      await this.errorCollection.insertOne(documentToInsert)
-    } catch (mongoError) {
-      console.error('Failed to save error to MongoDB:', mongoError)
     }
   }
 
@@ -185,36 +121,74 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
     }
   }
 
-  async getUserUsageSummary(userId: string, days: number = 30): Promise<any> {
-    if (!this.userUsageCollection) return null
+  async getUserUsageSummaryStats(userId: string, startDate?: Date, endDate?: Date): Promise<{
+      userId: string;
+      dateRange: { start?: Date; end?: Date };
+      totalRequests: number;
+      totalCharacters: number;
+      totalCreditsUsed: number;
+      eventsByAgent: Record<string, number>;
+      eventsByVoiceModel: Record<string, number>;
+  }> {
+      try {
+          const db = DatabaseService.getInstance();
+          const usageCollection = await db.getCollection('usage_events');
 
-    const since = new Date()
-    since.setDate(since.getDate() - days)
-    const sinceDate = since.toISOString().split('T')[0]
-
-    try {
-      const summary = await this.userUsageCollection.aggregate([
-        { $match: { userId, date: { $gte: sinceDate } } },
-        {
-          $group: {
-            _id: null,
-            totalRequests: { $sum: '$totalRequests' },
-            totalCharacters: { $sum: '$totalCharacters' },
-            totalAudioDuration: { $sum: '$totalAudioDuration' },
-            avgProcessingTime: { $avg: '$totalProcessingTime' },
-            uniqueVoices: { $addToSet: '$voicesUsed' },
-            uniqueModels: { $addToSet: '$modelsUsed' },
-            activeDays: { $sum: 1 }
+          const query: any = { userId };
+          
+          if (startDate || endDate) {
+              query.timestamp = {};
+              if (startDate) query.timestamp.$gte = startDate;
+              if (endDate) query.timestamp.$lte = endDate;
           }
-        }
-      ]).toArray()
 
-      return summary[0] || null
-    } catch (error) {
-      console.error('Failed to get user usage summary:', error)
-      return null
-    }
+          const usageEvents = await usageCollection.find(query).toArray();
+
+          return {
+              userId,
+              dateRange: { start: startDate, end: endDate },
+              totalRequests: usageEvents.length,
+              totalCharacters: usageEvents.reduce((sum, event) => sum + (event.metadata?.textLength || 0), 0),
+              totalCreditsUsed: usageEvents.reduce((sum, event) => sum + (event.cost || 0), 0),
+              eventsByAgent: usageEvents.reduce((acc, event) => {
+                  const agentName = event.metadata?.agentName || 'Unknown';
+                  acc[agentName] = (acc[agentName] || 0) + 1;
+                  return acc;
+              }, {} as Record<string, number>),
+              eventsByVoiceModel: usageEvents.reduce((acc, event) => {
+                  const voiceModel = event.metadata?.voiceModel || 'standard';
+                  acc[voiceModel] = (acc[voiceModel] || 0) + 1;
+                  return acc;
+              }, {} as Record<string, number>)
+          };
+
+      } catch (error) {
+          console.error('Failed to get usage summary stats:', error);
+          throw error;
+      }
   }
+
+
+  async recordUsageEvent(usageEvent: UsageEvent): Promise<string> {
+        try {
+            const db = DatabaseService.getInstance();
+            const usageCollection = await db.getCollection('usage_events');
+
+            const result = await usageCollection.insertOne({
+                ...usageEvent,
+                _id: new ObjectId()
+            });
+
+            console.log(`📝 Recorded usage event: ${result.insertedId}`);
+            return result.insertedId.toString();
+
+        } catch (error) {
+            console.error('Failed to record usage event:', error);
+            throw error;
+        }
+    }
+
+
 
   async getTopUsers(days: number = 30, limit: number = 10): Promise<any[]> {
     if (!this.userUsageCollection) return []
@@ -246,31 +220,12 @@ export class MongoAnalyticsLogger implements IAnalyticsLogger {
   async close(): Promise<void> {
     if (this.client) {
       await this.client.close()
-      this.isConnected = false
       console.log('📴 MongoDB analytics connection closed')
     }
   }
 
 
   //============ Private Helpers =============
-  private calculateEfficiency(audioDuration: number, processingTime: number): number {
-    return audioDuration > 0 ? processingTime / (audioDuration * 1000) : 0
-  }
-
-  private estimateAudioBytes(durationSeconds: number): number {
-    return Math.floor(durationSeconds * 16000) // 128kbps / 8 = 16KB per second
-  }
-
-  private generateRequestId(): string {
-    return `tts_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-  }
-
-  private determineService(context: any): 'tts' | 'voice' | 'general' {
-    if (context?.voiceId || context?.charactersRequested) return 'tts'
-    if (context?.voices || context?.voiceProvider) return 'voice'
-    return 'general'
-  }
-
   private mapToUserUsageStats(document: UserDailyUsageDocument): UserUsageStats {
     return {
       userId: document.userId,

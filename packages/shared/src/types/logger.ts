@@ -28,31 +28,6 @@ export interface UserUsageStats {
   updatedAt: Date
 }
 
-export interface TtsAnalyticsDocument {
-  _id?: string
-  userId: string
-  timestamp: Date
-  charactersRequested: number
-  charactersProcessed: number
-  audioDurationSeconds: number
-  audioLengthBytes: number
-  voiceId: string
-  modelId: string
-  processingTimeMs: number
-  efficiencyRatio: number
-  requestId: string
-  success: boolean
-}
-
-export interface ErrorAnalyticsDocument {
-  _id?: string
-  userId?: string
-  timestamp: Date
-  error: string
-  context: any
-  level: 'error' | 'warning'
-  service: 'tts' | 'voice' | 'general'
-}
 
 export interface UserDailyUsageDocument {
   _id?: string
@@ -80,8 +55,6 @@ export interface ITextValidator {
 
 
 export interface IAnalyticsLogger {
-  logSynthesis(metrics: SynthesisMetrics): Promise<void>
-  logError(error: string, context: any): Promise<void>
   getUserDailyStats(userId: string, date: string): Promise<UserUsageStats | null>
   getUserMonthlyStats(userId: string, year: number, month: number): Promise<UserUsageStats[]>
   updateUserUsage(userId: string, metrics: SynthesisMetrics): Promise<void>

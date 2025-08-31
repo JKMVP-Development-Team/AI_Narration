@@ -4,6 +4,7 @@ import {
     UserAddress
 } from '@shared/types/user';
 
+import { UsageEvent } from '@shared/types/meter';
 import { getUserByUserId, addCreditsToUser, logUserActivity } from './userService';
 import { DatabaseService } from './databaseService';
 
@@ -330,5 +331,32 @@ export async function deleteStripeCustomer(customerId: string): Promise<boolean>
     } catch (error) {
         console.error('Failed to delete Stripe customer:', error);
         return false;
+    }
+}
+
+
+export async function reportToStripe(userId: string, usageEvent: UsageEvent): Promise<void> {
+    try {
+        const stripe = getStripeInstance();
+        const user = await getUserByUserId(userId);
+        
+        if (!user || !user.stripeCustomerId) {
+            console.log(`⚠️ No Stripe customer for user ${userId}, skipping Stripe usage report`);
+            return;
+        }
+
+        await stripe.billing.meterEvents.create({
+            event_name: 'tts_generation',
+            payload: {
+                stripe_customer_id: user.stripeCustomerId,
+                value: usageEvent.cost.toString(),
+            },
+            timestamp: Math.floor(usageEvent.timestamp.getTime() / 1000)
+        });
+
+        console.log(`📊 Reported usage to Stripe for customer ${user.stripeCustomerId}`);
+
+    } catch (error) {
+        console.error('Failed to report usage to Stripe:', error);
     }
 }

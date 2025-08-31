@@ -249,28 +249,44 @@ export async function deductCreditsFromUser(userId: string, credits: number): Pr
             $inc: { credits: -credits },
             $set: { updatedAt: new Date() }
         },
-        { returnDocument: 'after' }
+        { 
+            returnDocument: 'after',
+            includeResultMetadata: true
+         }
     );
 
-    if (!updatedUser || !updatedUser.value) {
+    const userDocument = updatedUser?.value;
+
+    if (userDocument) {
+        console.log('User AFTER update:', {
+            _id: userDocument._id,
+            credits: userDocument.credits,
+            totalCreditsEverPurchased: userDocument.totalCreditsEverPurchased
+        });
+    } else {
+        console.error('No value returned from update operation');
+        console.error('Full updatedUser object:', updatedUser);
+    }
+
+    if (!userDocument) {
         console.error(`Failed to update user credits for user ${userId}.`);
         return null;
     }
 
-    console.log(`Deducted ${credits} credits from user ${userId}. New balance: ${updatedUser.value.credits}`);
+    console.log(`Deducted ${credits} credits from user ${userId}. New balance: ${userDocument.value.credits}`);
 
-    return {
-        _id: updatedUser._id.toString(),
-        name: updatedUser.name,
-        email: updatedUser.email,
-        stripeCustomerId: updatedUser.stripeCustomerId,
-        credits: updatedUser.credits,
-        totalCreditsEverPurchased: updatedUser.totalCreditsEverPurchased,
-        createdAt: updatedUser.createdAt,
-        updatedAt: updatedUser.updatedAt,
-        lastPurchaseAt: updatedUser.lastPurchaseAt,
-        status: updatedUser.status
-    }
+        return {
+            _id: userDocument._id.toString(),
+            name: userDocument.name,
+            email: userDocument.email,
+            stripeCustomerId: userDocument.stripeCustomerId,
+            credits: userDocument.credits,
+            totalCreditsEverPurchased: userDocument.totalCreditsEverPurchased,
+            createdAt: userDocument.createdAt,
+            updatedAt: userDocument.updatedAt,
+            lastPurchaseAt: userDocument.lastPurchaseAt,
+            status: userDocument.status
+        };
 }
 
 export async function getUserByUserId(userId: string): Promise<UserAccount | null> {
