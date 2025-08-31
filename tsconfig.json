@@ -19,7 +19,8 @@
     "paths": {
       "@shared/*": ["packages/shared/src/*"],
       "@api/*": ["apps/api/src/*"]
-    }
+    },
+    "jsx": "react-jsx"
   },
   "include": ["apps/**/*", "packages/**/*"],
   "exclude": ["node_modules", "dist"]

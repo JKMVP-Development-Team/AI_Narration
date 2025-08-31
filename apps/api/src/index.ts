@@ -3,21 +3,74 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import * as path from 'path';
 import { ttsRoutes } from './routes/tts';
-import ElevenLabsService from './services/elevenLabsService';
+import { stripeRoutes } from './routes/stripe';
+import { userRoutes } from './routes/user';
+import { MongoAnalyticsLogger } from './Utilities/AnalyticsLogger';
+import { stripeWebhookRouter } from './webhooks/stripeWebhooks';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
 
-const app = express();
+const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
+
+
+
 
 // Middleware
 app.use(cors());
+
+app.use('/webhooks', stripeWebhookRouter);
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Routes
 app.use('/api/tts', ttsRoutes);
+app.use('/api/stripe', stripeRoutes);
+app.use('/api/user', userRoutes);
+
+// TODO: Extract these /api/v1/ endpoints to separate route files
+// Then use: app.use('/api/v1', v1Routes);
+
+// ========== V1 API ENDPOINTS (Ready for extraction) ==========
+
+app.get('/api/v1/analytics/user/:userId/daily/:date', async (req, res) => {
+  try {
+    const { userId, date } = req.params;
+    const analytics = new MongoAnalyticsLogger();
+    const stats = await analytics.getUserDailyStats(userId, date);
+    res.json(stats);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get user daily stats' });
+  }
+});
+
+app.get('/api/v1/analytics/user/:userId/summary', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const days = req.query.days ? Number(req.query.days) : 30;
+    const analytics = new MongoAnalyticsLogger();
+    const summary = await analytics.getUserUsageSummary(userId, days);
+    res.json(summary);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get user summary' });
+  }
+});
+
+app.get('/api/v1/analytics/users/top', async (req, res) => {
+  try {
+    const days = req.query.days ? Number(req.query.days) : 30;
+    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const analytics = new MongoAnalyticsLogger();
+    const topUsers = await analytics.getTopUsers(days, limit);
+    res.json(topUsers);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get top users' });
+  }
+});
+
+// ========== END V1 API ENDPOINTS ==========
 
 // Health check
 app.get('/health', (req, res) => {
