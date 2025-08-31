@@ -15,6 +15,7 @@ function App() {
   // State for text input and selected voice
   const [text, setText] = useState('Welcome to the AI Narration App! This dark mode interface is designed for comfortable extended use. Enter your text and let our AI create beautiful narration for you.');
   const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('home'); // State for navigation
 
   // Voice presets data that is hardcoded for now
   const voicePresets: VoicePreset[] = [
@@ -103,6 +104,45 @@ function App() {
   return (
     // Main container
     <div className="container">
+      {/* Navigation Bar */}
+      <nav className="navbar">
+        <div className="nav-brand">
+          <i className="fas fa-microphone-alt"></i>
+          <span>AI Narration Studio</span>
+        </div>
+        {/* Navigation Button Controls*/}
+        <ul className="nav-links">
+          <li>
+            <a 
+              href="#home" 
+              className={activeTab === 'home' ? 'active' : ''}
+              onClick={(e) => { e.preventDefault(); setActiveTab('home'); }}
+            >
+              <i className="fas fa-home"></i> Home
+            </a>
+          </li>
+          <li>
+            <a href="/history">
+              <i className="fas fa-history"></i> History
+            </a>
+          </li>
+          <li>
+            <a href="/signup">
+              <i className="fas fa-user-plus"></i> Sign Up
+            </a>
+          </li>
+          <li>
+            <a 
+              href="#settings" 
+              className={activeTab === 'settings' ? 'active' : ''}
+              onClick={(e) => { e.preventDefault(); setActiveTab('settings'); }}
+            >
+              <i className="fas fa-cog"></i> Settings
+            </a>
+          </li>
+        </ul>
+      </nav>
+
       <header>
         <h1>AI Narration Studio</h1>
         <p className="subtitle">Transform your text into natural sounding audio with AI-powered narration</p>
@@ -171,6 +211,11 @@ function App() {
           ))}
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="footer">
+        <p>© 2025 JKMVP AI Narration. Powered by advanced AI voice synthesis.</p>
+      </footer>
     </div>
   );
 }
