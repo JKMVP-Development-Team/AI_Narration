@@ -1,6 +1,5 @@
 import { UsageEvent, MeteringResult } from '@shared/types/meter';
-import Stripe from 'stripe';
-import { getStripeInstance, reportToStripe } from './stripeService';
+import { reportToStripe } from './stripeService';
 import { getUserByUserId, deductCreditsFromUser } from './userService';
 import { MongoAnalyticsLogger } from '../Utilities/AnalyticsLogger';
 
@@ -34,7 +33,7 @@ export class MeterService {
             const currentCredits = user.credits || 0;
             const hasCredits = currentCredits >= requiredCredits;
 
-            console.log(`💳 Credit check for user ${userId}: ${currentCredits} available, ${requiredCredits} required`);
+            console.log(`Credit check for user ${userId}: ${currentCredits} available, ${requiredCredits} required`);
 
             return {
                 hasCredits,
@@ -48,12 +47,12 @@ export class MeterService {
 
     async meterTTSUsage(userId: string, textLength: number, agentId?: string, agentName?: string, voiceModel: string = 'standard', quality: string = 'standard'): Promise<MeteringResult> {
         try {
-            console.log(`📊 Starting TTS metering for user ${userId}`);
+            console.log(`Starting TTS metering for user ${userId}`);
             
             // Calculate required credits
             const requiredCredits = this.calculateTTSCredits(textLength, voiceModel, quality);
             
-            console.log(`💰 TTS cost calculation:`, {
+            console.log(`TTS cost calculation:`, {
                 textLength,
                 voiceModel,
                 quality,
@@ -64,7 +63,7 @@ export class MeterService {
             const creditCheck = await this.checkUserCredits(userId, requiredCredits);
             
             if (!creditCheck.hasCredits) {
-                console.log(`❌ Insufficient credits for user ${userId}: ${creditCheck.currentCredits} < ${requiredCredits}`);
+                console.log(`Insufficient credits for user ${userId}: ${creditCheck.currentCredits} < ${requiredCredits}`);
                 
                 return {
                     success: false,
@@ -108,7 +107,7 @@ export class MeterService {
                 usageEventId
             };
 
-            console.log(`✅ TTS metering successful:`, result);
+            console.log(`TTS metering successful:`, result);
 
             return result;
 
