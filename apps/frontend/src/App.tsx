@@ -91,8 +91,12 @@ function App() {
 
   // Load initial voice presets
   useEffect(() => {
-    loadVoicePresets();
-    loadCustomVoices(); // Loading custom voices (assuming voices are saved to user account)
+    try {
+      loadVoicePresets();
+      loadCustomVoices(); // Loading custom voices (assuming voices are saved to user account)
+    } catch (err) {
+      console.error("Error during initial load in useEffect:", err);
+    }
   }, []);
 
   // API ENDPOINT: GET /api/tts/presets
