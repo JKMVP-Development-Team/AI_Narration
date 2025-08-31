@@ -1,8 +1,10 @@
 
 export interface UserAccount {
     _id?: string;
-    name: string;
+    firstName?: string;
+    lastName?: string;
     email: string;
+    clerkId: string;
     stripeCustomerId: string;
     credits: number;
     totalCreditsEverPurchased: number;

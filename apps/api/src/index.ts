@@ -8,6 +8,7 @@ import { stripeRoutes } from './routes/stripe';
 import { userRoutes } from './routes/user';
 import { MongoAnalyticsLogger } from './Utilities/AnalyticsLogger';
 import { stripeWebhookRouter } from './webhooks/stripeWebhooks';
+import { clerkWebhookRouter } from './webhooks/clerkWebhooks';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
@@ -33,7 +34,9 @@ const hasPermission = (req: express.Request, res: express.Response, next: expres
   return next();
 };
 
+// Webhook routes (must come before express.json middleware)
 app.use('/webhooks', stripeWebhookRouter);
+app.use('/webhooks', clerkWebhookRouter);
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
