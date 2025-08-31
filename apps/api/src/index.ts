@@ -3,87 +3,42 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import * as path from 'path';
 import { ttsRoutes } from './routes/tts';
-import { TTSFactory } from './Factories/TTSFactory';
+import { stripeRoutes } from './routes/stripe';
+import { userRoutes } from './routes/user';
 import { MongoAnalyticsLogger } from './Utilities/AnalyticsLogger';
+import { stripeWebhookRouter } from './webhooks/stripeWebhooks';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
 
-const app = express();
+const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
+
+
+
 
 // Middleware
 app.use(cors());
+
+app.use('/webhooks', stripeWebhookRouter);
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Routes
 app.use('/api/tts', ttsRoutes);
+app.use('/api/stripe', stripeRoutes);
+app.use('/api/user', userRoutes);
 
 // TODO: Extract these /api/v1/ endpoints to separate route files
 // Then use: app.use('/api/v1', v1Routes);
 
 // ========== V1 API ENDPOINTS (Ready for extraction) ==========
-const ttsService = TTSFactory.createElevenLabsTTS();
-const voiceProvider = TTSFactory.createElevenLabsVoiceProvider();
-
-app.post('/api/v1/tts', async (req, res) => {
-  try {
-    const { text, voiceId, modelId, userId } = req.body ?? {};
-    
-    if (!text) {
-      return res.status(400).json({ error: 'Text is required' });
-    }
-
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID is required' });
-    }
-
-    const audio = await ttsService.synthesize({ text, voiceId, modelId, userId });
-    
-    res.setHeader('Content-Type', audio.mimeType);
-    res.send(audio.data);
-  } catch (err: any) {
-    console.error('TTS Error:', err.message);
-    
-    if (err.message.includes('timeout')) {
-      return res.status(408).json({ error: 'Request timeout. Please try again.' });
-    }
-    
-    if (err.message.includes('failed after') && err.message.includes('attempts')) {
-      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again later.' });
-    }
-    
-    res.status(400).json({ error: err.message ?? 'TTS error' });
-  }
-});
-
-app.get('/api/v1/voices', async (req, res) => {
-  try {
-    const limit = req.query.limit ? Number(req.query.limit) : 10;
-    const voices = await voiceProvider.getVoices(limit);
-    res.json(voices);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message ?? 'Failed to get voices' });
-  }
-});
-
-app.get('/api/v1/voices/:id', async (req, res) => {
-  try {
-    const voice = await voiceProvider.getVoiceById(req.params.id);
-    if (!voice) {
-      return res.status(404).json({ error: 'Voice not found' });
-    }
-    res.json(voice);
-  } catch (err: any) {
-    res.status(400).json({ error: err.message ?? 'Failed to get voice' });
-  }
-});
 
 app.get('/api/v1/analytics/user/:userId/daily/:date', async (req, res) => {
   try {
     const { userId, date } = req.params;
-    const analytics = new MongoAnalyticsLogger(process.env.MONGODB_URI!, process.env.MONGODB_DATABASE!);
+    const analytics = new MongoAnalyticsLogger();
     const stats = await analytics.getUserDailyStats(userId, date);
     res.json(stats);
   } catch (error) {
@@ -95,7 +50,7 @@ app.get('/api/v1/analytics/user/:userId/summary', async (req, res) => {
   try {
     const { userId } = req.params;
     const days = req.query.days ? Number(req.query.days) : 30;
-    const analytics = new MongoAnalyticsLogger(process.env.MONGODB_URI!, process.env.MONGODB_DATABASE!);
+    const analytics = new MongoAnalyticsLogger();
     const summary = await analytics.getUserUsageSummary(userId, days);
     res.json(summary);
   } catch (error) {
@@ -107,7 +62,7 @@ app.get('/api/v1/analytics/users/top', async (req, res) => {
   try {
     const days = req.query.days ? Number(req.query.days) : 30;
     const limit = req.query.limit ? Number(req.query.limit) : 10;
-    const analytics = new MongoAnalyticsLogger(process.env.MONGODB_URI!, process.env.MONGODB_DATABASE!);
+    const analytics = new MongoAnalyticsLogger();
     const topUsers = await analytics.getTopUsers(days, limit);
     res.json(topUsers);
   } catch (error) {
@@ -148,12 +103,8 @@ app.use('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 API Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🎙️  TTS API: http://localhost:${PORT}/api/tts`);
-  console.log(`🔊 TTS V1 API: http://localhost:${PORT}/api/v1/tts`);
-  console.log(`🎤 Voices API: http://localhost:${PORT}/api/v1/voices`);
-  console.log(`📈 Analytics API: http://localhost:${PORT}/api/v1/analytics`);
-});
+  console.log(`🚀 API Server running on port ${PORT}`)
+  console.log(`📊 Health check: http://localhost:${PORT}/health`)
+})
 
 export default app;
