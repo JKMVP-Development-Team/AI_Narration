@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import * as path from 'path';
+import { clerkMiddleware, getAuth, clerkClient, requireAuth } from '@clerk/express';
 import { ttsRoutes } from './routes/tts';
 import { stripeRoutes } from './routes/stripe';
 import { userRoutes } from './routes/user';
@@ -19,6 +20,7 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
+app.use(clerkMiddleware());
 
 app.use('/webhooks', stripeWebhookRouter);
 
@@ -26,12 +28,12 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Routes
-app.use('/api/tts', ttsRoutes);
-app.use('/api/stripe', stripeRoutes);
-app.use('/api/user', userRoutes);
+// To protect the routes, use the requireAuth middleware by redirecting users to sign in if they are not authenticated.
+app.use('/api/tts', requireAuth(), ttsRoutes);
+app.use('/api/stripe', requireAuth(), stripeRoutes);
+app.use('/api/user', requireAuth(), userRoutes);
 
-// TODO: Extract these /api/v1/ endpoints to separate route files
-// Then use: app.use('/api/v1', v1Routes);
+// TODO Add requireAuth() for data analytics routes when ready
 
 // ========== V1 API ENDPOINTS (Ready for extraction) ==========
 
@@ -49,9 +51,13 @@ app.get('/api/v1/analytics/user/:userId/daily/:date', async (req, res) => {
 app.get('/api/v1/analytics/user/:userId/summary', async (req, res) => {
   try {
     const { userId } = req.params;
-    const days = req.query.days ? Number(req.query.days) : 30;
+    const { startDate, endDate } = req.query;
     const analytics = new MongoAnalyticsLogger();
-    const summary = await analytics.getUserUsageSummary(userId, days);
+    const summary = await analytics.getUserUsageSummaryStats(
+      userId, 
+      startDate as Date | undefined, 
+      endDate as Date | undefined
+    );
     res.json(summary);
   } catch (error) {
     res.status(500).json({ error: 'Failed to get user summary' });

@@ -16,6 +16,7 @@
     "build:frontend": "vite build apps/frontend --outDir ../../dist/frontend"
   },
   "dependencies": {
+    "@clerk/express": "^1.7.26",
     "@elevenlabs/elevenlabs-js": "^2.11.0",
     "@google-cloud/text-to-speech": "^5.0.0",
     "axios": "^1.11.0",
@@ -31,7 +32,8 @@
     "openai": "^4.104.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "stripe": "^18.5.0"
+    "stripe": "^18.5.0",
+    "svix": "^1.75.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.0",
