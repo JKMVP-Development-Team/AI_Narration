@@ -11,6 +11,18 @@ router.post('/create-account', async (req, res) => {
   try {
     const { name, email, address } = req.body;
 
+    if (!name || !email) {
+      return res.status(400).json({ error: 'Name and email are required' });
+    }
+
+    if (typeof name !== 'string' || typeof email !== 'string') {
+      return res.status(400).json({ error: 'Invalid name or email format' });
+    }
+
+    if (address && typeof address !== 'object') {
+      return res.status(400).json({ error: 'Invalid address format' });
+    }
+
     let data = { name, email, address};
 
     const user = await createOrUpdateUser(data);

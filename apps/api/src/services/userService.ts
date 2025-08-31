@@ -93,7 +93,7 @@ export async function createOrUpdateUser(data: {
                 email: data.email,
                 name: data.name,
                 hasStripeCustomer: !!user.stripeCustomerId,
-                stripeCustomerRecreated: !stripeCustomer && !!user.stripeCustomerId
+                stripeCustomerRecreated: !!(!stripeCustomer && user.stripeCustomerId)
             });
 
 
@@ -258,7 +258,19 @@ export async function deductCreditsFromUser(userId: string, credits: number): Pr
     }
 
     console.log(`Deducted ${credits} credits from user ${userId}. New balance: ${updatedUser.value.credits}`);
-    return updatedUser.value as UserAccount;
+
+    return {
+        _id: updatedUser._id.toString(),
+        name: updatedUser.name,
+        email: updatedUser.email,
+        stripeCustomerId: updatedUser.stripeCustomerId,
+        credits: updatedUser.credits,
+        totalCreditsEverPurchased: updatedUser.totalCreditsEverPurchased,
+        createdAt: updatedUser.createdAt,
+        updatedAt: updatedUser.updatedAt,
+        lastPurchaseAt: updatedUser.lastPurchaseAt,
+        status: updatedUser.status
+    }
 }
 
 export async function getUserByUserId(userId: string): Promise<UserAccount | null> {
@@ -308,7 +320,18 @@ export async function updateUserStatus(userId: string, status: 'active' | 'inact
         return null;
     }
 
-    return updatedUser.value as UserAccount || null;
+    return {
+        _id: updatedUser.value._id.toString(),
+        name: updatedUser.value.name,
+        email: updatedUser.value.email,
+        stripeCustomerId: updatedUser.value.stripeCustomerId,
+        credits: updatedUser.value.credits,
+        totalCreditsEverPurchased: updatedUser.value.totalCreditsEverPurchased,
+        createdAt: updatedUser.value.createdAt,
+        updatedAt: updatedUser.value.updatedAt,
+        lastPurchaseAt: updatedUser.value.lastPurchaseAt,
+        status: updatedUser.value.status
+    }
 }
 
 export async function getUserStats(userId: string): Promise<{

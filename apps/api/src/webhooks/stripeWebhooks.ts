@@ -11,6 +11,10 @@ router.post('/stripe-webhook', express.raw({ type: 'application/json' }), async 
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 
+  if (!endpointSecret) {
+    return res.status(400).send('Webhook Error: Missing webhook secret');
+  }
+
   try {
     let event = stripe.webhooks.constructEvent(req.body, sig as string, endpointSecret);
 

@@ -13,6 +13,10 @@ router.post('/create-checkout-session', async (req, res) => {
   try {
     const { priceId, userId} = req.body;
     
+    if (!priceId || !userId) {
+      return res.status(400).json({ success: false, error: 'Missing priceId or userId' });
+    }
+    
     let user = await getUserByUserId(userId);
     let price = await getPriceById(priceId);
 

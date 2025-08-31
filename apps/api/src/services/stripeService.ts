@@ -1,23 +1,34 @@
-
+import Stripe from 'stripe';
 import {
     UserAccount,
-    CreditPurchase,
     UserAddress
 } from '@shared/types/user';
 
 import { getUserByUserId, addCreditsToUser, logUserActivity } from './userService';
 import { DatabaseService } from './databaseService';
-import { Collection } from 'mongodb';
 
 const FRONTEND = process.env.FRONTEND_URL || 'http://localhost:3000';
+let stripeInstance: Stripe | null = null;
 
-export function getStripeInstance() {
+const getStripeApiKey = (): string => {
     const apiKey = process.env.STRIPE_API_KEY;
     if (!apiKey) {
         throw new Error('STRIPE_API_KEY is not configured in environment variables');
     }
-    return require('stripe')(apiKey);
+    return apiKey;
 }
+
+
+export function getStripeInstance(): Stripe {
+    if (!stripeInstance) {
+        stripeInstance = new Stripe(getStripeApiKey(), {
+            apiVersion: '2025-08-27.basil',
+            typescript: true
+        });
+    }
+    return stripeInstance;
+}
+
 
 export async function createCheckoutSession(
     user: UserAccount,
@@ -136,6 +147,10 @@ export async function fulfillCheckout(sessionId: string): Promise<boolean> {
         // Only fulfill if the payment was successful
         if (session.payment_status === 'paid') {
             const userId = session.metadata?.userId;
+
+            if (!userId) {
+                throw new Error('User ID not found in session metadata');
+            }
 
             console.log(`Fulfilling purchase for user ${userId} for session ${sessionId}`);
             const user = await getUserByUserId(userId);
@@ -300,7 +315,7 @@ export async function getStripeCustomers(): Promise<any[] | null> {
     try {
         const stripe = getStripeInstance();
         const customers = await stripe.customers.list({ limit: 5 });
-        return customers
+        return customers.data
     } catch (error) {
         console.error('Failed to retrieve Stripe customer:', error);
         return null;
