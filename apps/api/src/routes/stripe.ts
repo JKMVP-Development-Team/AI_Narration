@@ -1,10 +1,9 @@
 
-import { Router, Request, Response, response } from 'express';
+import { Router } from 'express';
 import { getUserByUserId, deleteUserAndStripeCustomer } from '../services/userService';
-import { expireCheckoutSession, getStripeCustomers, createCheckoutSession, getPriceById, getStripeInstance, fulfillCheckout } from '../services/stripeService';
+import { expireCheckoutSession, getStripeCustomers, createCheckoutSession, getPriceById, retrieveCheckoutSession} from '../services/stripeService';
 
 const router: Router = Router();
-const bodyParser = require('body-parser');
 
 
 // ========== STRIPE ROUTES =================
@@ -38,6 +37,23 @@ router.post('/create-checkout-session', async (req, res) => {
   } catch (error: any) {
     console.error('Error creating checkout session:', error);
     res.status(400).json({ success: false, error: 'Failed to create checkout session' });
+  }
+});
+
+router.get('/retrieve-checkout-session', async (req, res) => {
+  try {
+    const { sessionId } = req.query;
+    if (typeof sessionId !== 'string') {
+      throw new Error('Invalid sessionId');
+    }
+    const session = await retrieveCheckoutSession(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+    res.json({ success: true, session });
+  } catch (error) {
+    console.error('Error retrieving checkout session:', error);
+    res.status(500).json({ success: false, error: 'Failed to retrieve checkout session' });
   }
 });
 
@@ -90,30 +106,7 @@ router.delete('/customers/:customerId', async (req, res) => {
     }
 });
 
-// Webhook to handle Stripe events
-router.post('/webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => {
-  const stripe = getStripeInstance();
-  const sig = req.headers['stripe-signature'];
-  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 
-  try {
-    let event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
-
-
-    switch (event.type) {
-      case event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded':
-        console.log(`Checkout session ${event.data.object.id} completed!`);
-        break;
-      case event.type === 'payment_intent.succeeded':
-        fulfillCheckout(event.data.object.id);
-        break;
-    }
-  
-    res.status(200).json({ received: true });
-  } catch (error) {
-    return res.status(400).send(`Webhook Error: ${error}`);
-  }
-});
 
 export { router as stripeRoutes };

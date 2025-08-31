@@ -6,6 +6,7 @@ import { ttsRoutes } from './routes/tts';
 import { stripeRoutes } from './routes/stripe';
 import { userRoutes } from './routes/user';
 import { MongoAnalyticsLogger } from './Utilities/AnalyticsLogger';
+import { stripeWebhookRouter } from './webhooks/stripeWebhooks';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
@@ -14,8 +15,13 @@ const app: express.Application = express();
 const PORT = process.env.PORT || 3001;
 
 
+
+
 // Middleware
 app.use(cors());
+
+app.use('/webhooks', stripeWebhookRouter);
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 

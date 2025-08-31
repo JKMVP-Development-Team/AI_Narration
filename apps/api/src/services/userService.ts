@@ -7,7 +7,7 @@ import {
 
 import { ObjectId } from 'mongodb';
 import { DatabaseService } from './databaseService';
-import { getStripeInstance, createStripeCustomer, deleteStripeCustomer } from './stripeService';
+import { getStripeInstance, createStripeCustomer, deleteStripeCustomer, getStripeCustomer } from './stripeService';
 
 
 export async function createOrUpdateUser(data: {
@@ -66,9 +66,15 @@ export async function createOrUpdateUser(data: {
                 status: updatedUser.status 
             };
 
-            // Update Stripe customer if needed and no existing Stripe customer
-            if (!user.stripeCustomerId) {
-                console.log(`Creating Stripe customer for existing user: ${user._id}`);
+            // Find Existing Stripe Customer
+            let stripeCustomer = null;
+
+            if (user.stripeCustomerId) {
+                stripeCustomer = await getStripeCustomer(user.stripeCustomerId);
+            }   
+
+            if (!stripeCustomer) {
+                console.log('No Stripe customer found, creating new one...');
                 const stripeCustomerId = await createStripeCustomer(user, data.address);
                 if (stripeCustomerId) {
                     await usersCollection.updateOne(
@@ -76,14 +82,20 @@ export async function createOrUpdateUser(data: {
                         { $set: { stripeCustomerId } }
                     );
                     user.stripeCustomerId = stripeCustomerId;
+                    console.log(`Updated user with new Stripe customer ID: ${stripeCustomerId}`);
                 }
+            } else {
+                console.log('Existing Stripe customer found:', stripeCustomer.id);
             }
+                
 
             await logUserActivity(user._id!, 'user_updated', {
                 email: data.email,
                 name: data.name,
-                hasStripeCustomer: !!user.stripeCustomerId
+                hasStripeCustomer: !!user.stripeCustomerId,
+                stripeCustomerRecreated: !stripeCustomer && !!user.stripeCustomerId
             });
+
 
             return user;
         }
@@ -165,26 +177,51 @@ export async function addCreditsToUser(userId: string, credits: number): Promise
                     updatedAt: new Date()
                 }
             },
-            { returnDocument: 'after' }
+            { 
+                returnDocument: 'after',
+                includeResultMetadata: true
+            }
         );
 
-        if (!updatedUser || !updatedUser.value) {
+        console.log('📊 MongoDB update result:', {
+            found: !!updatedUser,
+            hasValue: !!updatedUser?.value,
+            ok: updatedUser?.ok,
+            modifiedCount: updatedUser?.lastErrorObject?.updatedExisting,
+            upserted: updatedUser?.lastErrorObject?.upserted
+        });
+
+        const userDocument = updatedUser?.value;
+
+        if (userDocument) {
+            console.log('✅ User AFTER update:', {
+                _id: userDocument._id,
+                credits: userDocument.credits,
+                totalCreditsEverPurchased: userDocument.totalCreditsEverPurchased
+            });
+        } else {
+            console.error('❌ No value returned from update operation');
+            console.error('Full updatedUser object:', updatedUser);
+        }
+
+        if (!userDocument) {
             console.error(`Failed to update user credits for user ${userId}.`);
             return null;
         }
 
-        console.log(`Added ${credits} credits to user ${userId}. New balance: ${updatedUser.value?.credits}`);
+
+        console.log(`Added ${credits} credits to user ${userId}. New balance: ${userDocument.credits}`);
         return {
-            _id: updatedUser.value._id.toString(),
-            name: updatedUser.value.name,
-            email: updatedUser.value.email,
-            stripeCustomerId: updatedUser.value.stripeCustomerId,
-            credits: updatedUser.value.credits,
-            totalCreditsEverPurchased: updatedUser.value.totalCreditsEverPurchased,
-            createdAt: updatedUser.value.createdAt,
-            updatedAt: updatedUser.value.updatedAt,
-            lastPurchaseAt: updatedUser.value.lastPurchaseAt,
-            status: updatedUser.value.status
+            _id: userDocument._id.toString(),
+            name: userDocument.name,
+            email: userDocument.email,
+            stripeCustomerId: userDocument.stripeCustomerId,
+            credits: userDocument.credits,
+            totalCreditsEverPurchased: userDocument.totalCreditsEverPurchased,
+            createdAt: userDocument.createdAt,
+            updatedAt: userDocument.updatedAt,
+            lastPurchaseAt: userDocument.lastPurchaseAt,
+            status: userDocument.status
         };
     } catch (error) {
         console.error('Failed to add credits to user:', error);

@@ -9,9 +9,9 @@ const router: Router = Router();
 
 router.post('/create-account', async (req, res) => {
   try {
-    const { userId, name, email, address } = req.body;
+    const { name, email, address } = req.body;
 
-    let data = { userId, name, email, address};
+    let data = { name, email, address};
 
     const user = await createOrUpdateUser(data);
     res.json({ success: true, user });

@@ -30,27 +30,29 @@ export async function createCheckoutSession(
             throw new Error('User does not have a Stripe customer ID');
         }
 
-        const price = await stripe.prices.retrieve(priceId?.id || priceId);
+        const actualPriceId = priceId?.id || priceId;
+        const price = await stripe.prices.retrieve(actualPriceId);
         const creditsPerCent = 10;
         const creditsForPurchase = (price.unit_amount || 0) / 100 * creditsPerCent;
 
         const session = await stripe.checkout.sessions.create({
             line_items: [
                 {
-                    price: priceId?.id,
+                    price: actualPriceId,
                     quantity: 1,
                 },
             ],
             mode: 'payment',
             success_url: `${FRONTEND}`, // TODO Add Success URL
             cancel_url: `${FRONTEND}`, // TODO Add Cancel URL
-            automatic_tax: { enabled: true },
+            // automatic_tax: { enabled: true }, // TODO Enable tax Update Stripe Business Profile
             customer: user?.stripeCustomerId,
             metadata: {
                 planName: 'Credit Package',
-                userId: user._id || 'anonymous',
+                userId: user._id!,
                 creditsForPurchase: creditsForPurchase.toString(),
-                purchaseType: 'credits'
+                purchaseType: 'credits',
+                userEmail: user.email
             },
             allow_promotion_codes: true,
             billing_address_collection: 'auto',
@@ -66,7 +68,7 @@ export async function createCheckoutSession(
                     metadata: {
                         planName: 'Credit Package',
                         userId: user._id || 'anonymous',
-                        credits: user.credits || '200',
+                        creditsForPurchase: creditsForPurchase.toString(),
                         purchaseType: 'credits'
                     }
                 }
@@ -116,7 +118,7 @@ export async function fulfillCheckout(sessionId: string): Promise<boolean> {
         // Check if fulfillment already exists
         if (existingFulfillment) {
             console.log(`Fulfillment already processed for session ${sessionId}`);
-            return false;
+            return true;
         }
 
         // Retrieve the session with expanded line items
@@ -124,8 +126,15 @@ export async function fulfillCheckout(sessionId: string): Promise<boolean> {
             expand: ['line_items', 'line_items.data.price.product'],
         });
 
+        console.log(`Session details:`, {
+            sessionId: session.id,
+            payment_status: session.payment_status,
+            metadata: session.metadata,
+            hasLineItems: !!session.line_items?.data?.length
+        });
+
         // Only fulfill if the payment was successful
-        if (session.payment_status !== 'unpaid') {
+        if (session.payment_status === 'paid') {
             const userId = session.metadata?.userId;
 
             console.log(`Fulfilling purchase for user ${userId} for session ${sessionId}`);
@@ -176,7 +185,7 @@ export async function fulfillCheckout(sessionId: string): Promise<boolean> {
             await fulfillmentCollection.insertOne(fulfillmentRecord);
 
             // Add credits to the user's account
-            const result = addCreditsToUser(userId, parseInt(session.metadata?.credits || '0'));
+            const result = await addCreditsToUser(userId, totalCredits);
             
             if (!result) {
                 throw new Error('Failed to add credits to user');
@@ -226,13 +235,12 @@ export async function createStripeCustomer(user: UserAccount, location: UserAddr
     try {
         const stripe = getStripeInstance();
 
-        if (user.stripeCustomerId) {
-            const existingCustomer = await stripe.customers.retrieve(user.stripeCustomerId);
+        // Check if customer already exists
+        const stripeCustomer = await getStripeCustomer(user.stripeCustomerId);
 
-            if (!existingCustomer.deleted) {
-                console.log(`Stripe customer already exists: ${user.stripeCustomerId}`);
-                return user.stripeCustomerId;
-            }
+        if (stripeCustomer) {
+            console.log(`Stripe customer already exists: ${user.stripeCustomerId}`);
+            return user.stripeCustomerId;
         }
 
         // TODO Text Validation
@@ -257,6 +265,33 @@ export async function createStripeCustomer(user: UserAccount, location: UserAddr
         return customer.id;
     } catch (error) {
         console.error('Failed to create Stripe customer:', error);
+        return null;
+    }
+}
+
+export async function getStripeCustomer(customerId: string): Promise<any | null> {
+    try {
+
+        if (!customerId) {
+            console.warn('No customer ID provided to retrieve Stripe customer');
+            return null;
+        }
+
+        const stripe = getStripeInstance();
+        const customer = await stripe.customers.retrieve(customerId);
+
+        if (customer.deleted) {
+            console.warn(`Stripe customer ${customerId} has been deleted`);
+            return null;
+        }
+        return customer;
+    } catch (error: any) {
+        if (error.type === 'StripeInvalidRequestError' && error.code === 'resource_missing') {
+            console.log('Stripe customer not found:', customerId);
+            return null;
+        }
+
+        console.error('Failed to retrieve Stripe customer:', error);
         return null;
     }
 }
