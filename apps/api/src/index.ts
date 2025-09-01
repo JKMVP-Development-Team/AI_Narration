@@ -1,14 +1,15 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import * as path from 'path';
-import { clerkMiddleware, getAuth, clerkClient, requireAuth } from '@clerk/express';
+import { clerkMiddleware } from '@clerk/express';
 import { ttsRoutes } from './routes/tts';
 import { stripeRoutes } from './routes/stripe';
 import { userRoutes } from './routes/user';
 import { MongoAnalyticsLogger } from './Utilities/AnalyticsLogger';
 import { stripeWebhookRouter } from './webhooks/stripeWebhooks';
 import { clerkWebhookRouter } from './webhooks/clerkWebhooks';
+import { requireAuth, AuthenticatedRequest } from './middleware/auth';
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
@@ -24,15 +25,6 @@ app.use(cors());
 app.use(clerkMiddleware());
 
 
-const hasPermission = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const auth = getAuth(req);
-
-  if (!auth.has({ permission: 'org:admin:example'})) {
-    return res.status(403).json({ error: 'Forbidden' });
-  }
-
-  return next();
-};
 
 // Webhook routes (must come before express.json middleware)
 app.use('/webhooks', stripeWebhookRouter);
@@ -41,17 +33,18 @@ app.use('/webhooks', clerkWebhookRouter);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+
 // Routes
 // To protect the routes, use the requireAuth middleware by redirecting users to sign in if they are not authenticated.
-app.use('/api/tts', requireAuth(), hasPermission, ttsRoutes);
-app.use('/api/stripe', requireAuth(), hasPermission, stripeRoutes);
-app.use('/api/user', requireAuth(), hasPermission, userRoutes);
+app.use('/api/tts', requireAuth, ttsRoutes);
+app.use('/api/stripe', requireAuth, stripeRoutes);
+app.use('/api/user', requireAuth, userRoutes);
 
 // TODO Add requireAuth() for data analytics routes when ready
 
 // ========== V1 API ENDPOINTS (Ready for extraction) ==========
 
-app.get('/api/v1/analytics/user/:userId/daily/:date', async (req, res) => {
+app.get('/api/v1/analytics/user/:userId/daily/:date', requireAuth, async (req, res) => {
   try {
     const { userId, date } = req.params;
     const analytics = new MongoAnalyticsLogger();
@@ -62,7 +55,7 @@ app.get('/api/v1/analytics/user/:userId/daily/:date', async (req, res) => {
   }
 });
 
-app.get('/api/v1/analytics/user/:userId/summary', async (req, res) => {
+app.get('/api/v1/analytics/user/:userId/summary', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
     const { startDate, endDate } = req.query;
@@ -78,7 +71,7 @@ app.get('/api/v1/analytics/user/:userId/summary', async (req, res) => {
   }
 });
 
-app.get('/api/v1/analytics/users/top', async (req, res) => {
+app.get('/api/v1/analytics/users/top', requireAuth, async (req, res) => {
   try {
     const days = req.query.days ? Number(req.query.days) : 30;
     const limit = req.query.limit ? Number(req.query.limit) : 10;
