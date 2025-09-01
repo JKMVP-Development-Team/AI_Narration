@@ -11,6 +11,7 @@ import { stripeWebhookRouter } from './webhooks/stripeWebhooks';
 import { clerkWebhookRouter } from './webhooks/clerkWebhooks';
 import { requireAuth, AuthenticatedRequest } from './middleware/auth';
 
+
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
 

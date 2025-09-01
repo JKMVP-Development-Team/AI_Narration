@@ -7,7 +7,7 @@ import {
     handleClerkUserDeleted
 } from '../services/userService';
 
-const router = express.Router();
+const router: express.Router = express.Router();
 
 // Middleware to get raw body for webhook verification
 router.use('/clerk', express.raw({ type: 'application/json' }));
