@@ -1,38 +1,5 @@
-export interface Voice {
-  id: string;
-  name: string;
-  category: string;
-  previewUrl: string;
-}
 
-export interface ElevenLabsVoice {
-  voice_id: string;
-  name: string;
-  category: string;
-  preview_url: string;
-  description?: string;
-  labels?: Record<string, string>;
-  samples?: any[];
-  settings?: {
-    stability: number;
-    similarity_boost: number;
-    style?: number;
-    use_speaker_boost?: boolean;
-  };
-}
 
-export interface ElevenLabsVoicesResponse {
-  voices: ElevenLabsVoice[];
-}
-
-export interface TTSRequest {
-  text: string;
-  model_id?: string;
-  voice_settings?: {
-    stability?: number;
-    similarity_boost?: number;
-  };
-}
 
 
 // Analytics types
@@ -99,4 +66,23 @@ export interface UserDailyUsageDocument {
   modelsUsed: string[]
   createdAt: Date
   updatedAt: Date
+}
+
+export interface ValidationResult {
+  isValid: boolean
+  error?: string
+  truncatedText?: string
+}
+
+export interface ITextValidator {
+  validate(text: string): ValidationResult
+}
+
+
+export interface IAnalyticsLogger {
+  logSynthesis(metrics: SynthesisMetrics): Promise<void>
+  logError(error: string, context: any): Promise<void>
+  getUserDailyStats(userId: string, date: string): Promise<UserUsageStats | null>
+  getUserMonthlyStats(userId: string, year: number, month: number): Promise<UserUsageStats[]>
+  updateUserUsage(userId: string, metrics: SynthesisMetrics): Promise<void>
 }

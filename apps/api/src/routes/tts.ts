@@ -6,7 +6,7 @@ import {
   ApiResponse 
 } from '@shared/types/tts';
 
-const router = Router();
+const router: Router = Router();
 
 // Configure multer for file uploads
 const upload = multer({
