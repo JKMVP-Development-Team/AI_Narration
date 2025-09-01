@@ -17,34 +17,119 @@ export class TTSService {
   private readonly xttsBaseUrl: string;
   private readonly outputDir: string;
   private readonly speakersDir: string;
+  private readonly tempDir: string;
+  private readonly userUploadsDir: string;
+  private readonly presetsDir: string;
+  private readonly presetsPath: string;
+  private readonly userUploadsPath: string;
 
   constructor() {
     this.xttsBaseUrl = process.env.XTTS_API_URL || 'http://localhost:8020';
-    this.outputDir = process.env.TTS_OUTPUT_DIR || './xtts-data/testOutput';
+    this.outputDir = process.env.TTS_OUTPUT_DIR || './xtts-data/output';
     this.speakersDir = process.env.TTS_SPEAKERS_DIR || './xtts-data/speakers';
+    
+    // Derived paths
+    this.tempDir = path.join(this.outputDir, 'temp');
+    this.userUploadsDir = path.join(this.speakersDir, 'user-uploads');
+    this.presetsDir = path.join(this.speakersDir, 'presets');
+    
+    // API paths
+    this.presetsPath = '/app/speakers/presets';
+    this.userUploadsPath = '/app/speakers/user-uploads';
   }
-
 
   // Voice presets management
   public getVoicePresets(): VoicePreset[] {
     const presets: VoicePreset[] = [
       {
-        id: 'hawking',
-        name: 'Stephen Hawking',
-        description: 'Renowned theoretical physicist',
-        filePath: '/app/speakers/hawking01.wav'
+        id: 'josh',
+        name: 'Josh',
+        description: 'American, male, Pittsburgh, Pennsylvania, USA',
+        filePath: `${this.presetsPath}/josh.wav`
       },
       {
-        id: 'eastwood',
-        name: 'Clint Eastwood',
-        description: 'Iconic actor and director',
-        filePath: '/app/speakers/eastwood_lawyers.wav'
+        id: 'emily',
+        name: 'Emily',
+        description: 'British, female, Birmingham, UK',
+        filePath: `${this.presetsPath}/emily.wav`
       },
       {
-        id: 'manson',
-        name: 'Charles Manson',
-        description: 'Historical figure voice',
-        filePath: '/app/speakers/manson_believe_me.wav'
+        id: 'liam',
+        name: 'Liam',
+        description: 'Australian, male, Brisbane, Australia',
+        filePath: `${this.presetsPath}/liam.wav`
+      },
+      {
+        id: 'mariah',
+        name: 'Mariah',
+        description: 'Jamaican, female, Saint Anne\'s Bay, Jamaica',
+        filePath: `${this.presetsPath}/mariah.wav`
+      },
+      {
+        id: 'daniel',
+        name: 'Daniel',
+        description: 'American, male, Fairfax, Virginia, USA',
+        filePath: `${this.presetsPath}/daniel.wav`
+      },
+      {
+        id: 'jessica',
+        name: 'Jessica',
+        description: 'American, female, Brooklyn, New York, USA',
+        filePath: `${this.presetsPath}/jessica.wav`
+      },
+      {
+        id: 'marcus',
+        name: 'Marcus',
+        description: 'American, male, Macon, Mississippi, USA',
+        filePath: `${this.presetsPath}/marcus.wav`
+      },
+      {
+        id: 'chloe',
+        name: 'Chloe',
+        description: 'Australian, female, Perth, Australia',
+        filePath: `${this.presetsPath}/chloe.wav`
+      },
+      {
+        id: 'sarah',
+        name: 'Sarah',
+        description: 'American, female, Carthage, Texas, USA',
+        filePath: `${this.presetsPath}/sarah.wav`
+      },
+      {
+        id: 'hannah',
+        name: 'Hannah',
+        description: 'American, female, Davenport, Iowa, USA',
+        filePath: `${this.presetsPath}/hannah.wav`
+      },
+      {
+        id: 'sophie',
+        name: 'Sophie',
+        description: 'British, female, Staffordshire, UK',
+        filePath: `${this.presetsPath}/sophie.wav`
+      },
+      {
+        id: 'lucy',
+        name: 'Lucy',
+        description: 'British, female, Leicester, UK',
+        filePath: `${this.presetsPath}/lucy.wav`
+      },
+      {
+        id: 'oliver',
+        name: 'Oliver',
+        description: 'British, male, Henley-on-Thames, Oxfordshire, UK',
+        filePath: `${this.presetsPath}/oliver.wav`
+      },
+      {
+        id: 'connor',
+        name: 'Connor',
+        description: 'Northern Irish, male, Belfast, Northern Ireland, UK',
+        filePath: `${this.presetsPath}/connor.wav`
+      },
+      {
+        id: 'madison',
+        name: 'Madison',
+        description: 'American, female, Norton, Virginia, USA',
+        filePath: `${this.presetsPath}/madison.wav`
       }
     ];
 
@@ -100,7 +185,7 @@ export class TTSService {
 
       // Save the audio file
       const filename = `tts_${uuidv4()}.wav`;
-      const outputPath = path.join(this.outputDir, 'temp', filename);
+      const outputPath = path.join(this.tempDir, filename);
       
       fs.writeFileSync(outputPath, response.data);
 
@@ -135,20 +220,19 @@ export class TTSService {
     const voiceId = uuidv4();
     const extension = path.extname(originalFilename) || '.wav';
     const filename = `${userId}_${voiceId}${extension}`;
-    const filePath = path.join(this.speakersDir, 'user-uploads', filename);
+    const filePath = path.join(this.userUploadsDir, filename);
 
     fs.writeFileSync(filePath, audioBuffer);
 
     return {
       voiceId,
-      filePath: `/app/speakers/user-uploads/${filename}`
+      filePath: `${this.userUploadsPath}/${filename}`
     };
   }
 
-
   // Audio file serving
   public getAudioFile(filename: string): Buffer | null {
-    const filePath = path.join(this.outputDir, 'temp', filename);
+    const filePath = path.join(this.tempDir, filename);
     
     if (fs.existsSync(filePath)) {
       return fs.readFileSync(filePath);
@@ -159,15 +243,14 @@ export class TTSService {
 
   // Cleanup temporary files
   public cleanupTempFiles(olderThanMinutes: number = 60): void {
-    const tempDir = path.join(this.outputDir, 'temp');
     const cutoffTime = Date.now() - (olderThanMinutes * 60 * 1000);
 
-    if (!fs.existsSync(tempDir)) return;
+    if (!fs.existsSync(this.tempDir)) return;
 
-    const files = fs.readdirSync(tempDir);
+    const files = fs.readdirSync(this.tempDir);
     
     files.forEach(file => {
-      const filePath = path.join(tempDir, file);
+      const filePath = path.join(this.tempDir, file);
       const stats = fs.statSync(filePath);
       
       if (stats.mtime.getTime() < cutoffTime) {
@@ -176,7 +259,6 @@ export class TTSService {
       }
     });
   }
-  
 }
 
 // Export singleton instance
