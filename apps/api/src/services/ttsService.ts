@@ -211,23 +211,81 @@ export class TTSService {
     }
   }
 
-  // User voice upload and training
-  public async uploadUserVoice(
-    userId: string, 
-    audioBuffer: Buffer, 
-    originalFilename: string
-  ): Promise<{ voiceId: string; filePath: string }> {
-    const voiceId = uuidv4();
-    const extension = path.extname(originalFilename) || '.wav';
-    const filename = `${userId}_${voiceId}${extension}`;
-    const filePath = path.join(this.userUploadsDir, filename);
+  // Generate speech with uploaded voice file (temporary, no persistent storage)
+  public async generateSpeechWithUploadedVoice(
+    text: string,
+    voiceBuffer: Buffer,
+    language: string = 'en'
+  ): Promise<TTSResponse> {
+    let tempVoiceFile: string | null = null;
+    
+    try {
+      // Create temporary voice file
+      const tempFilename = `temp_voice_${uuidv4()}.wav`;
+      tempVoiceFile = path.join(this.tempDir, tempFilename);
+      
+      // Ensure temp directory exists
+      if (!fs.existsSync(this.tempDir)) {
+        fs.mkdirSync(this.tempDir, { recursive: true });
+      }
+      
+      // Save uploaded voice to temp file
+      fs.writeFileSync(tempVoiceFile, voiceBuffer);
 
-    fs.writeFileSync(filePath, audioBuffer);
+      // Generate TTS using the temp voice file
+      const xttsRequest: XTTSApiRequest = {
+        text,
+        speaker_wav: tempVoiceFile,
+        language
+      };
 
-    return {
-      voiceId,
-      filePath: `${this.userUploadsPath}/${filename}`
-    };
+      const response = await axios.post(
+        `${this.xttsBaseUrl}/tts_to_audio/`,
+        xttsRequest,
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          responseType: 'arraybuffer'
+        }
+      );
+
+      // Save the generated audio file
+      const outputFilename = `tts_${uuidv4()}.wav`;
+      const outputPath = path.join(this.tempDir, outputFilename);
+      
+      fs.writeFileSync(outputPath, response.data);
+
+      // Get file metadata
+      const stats = fs.statSync(outputPath);
+      
+      return {
+        success: true,
+        audioUrl: `/api/tts/audio/${outputFilename}`,
+        metadata: {
+          duration: 0,
+          fileSize: stats.size,
+          format: 'wav'
+        }
+      };
+
+    } catch (error: any) {
+      console.error('TTS Generation with Uploaded Voice Error:', error);
+      return {
+        success: false,
+        error: error.response?.data?.detail || error.message || 'TTS generation with uploaded voice failed'
+      };
+    } finally {
+      // Always clean up the temporary voice file
+      if (tempVoiceFile && fs.existsSync(tempVoiceFile)) {
+        try {
+          fs.unlinkSync(tempVoiceFile);
+          console.log(`Cleaned up temporary voice file: ${tempVoiceFile}`);
+        } catch (cleanupError) {
+          console.error(`Failed to cleanup temporary voice file: ${tempVoiceFile}`, cleanupError);
+        }
+      }
+    }
   }
 
   // Audio file serving
