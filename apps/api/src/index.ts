@@ -8,6 +8,7 @@ import { userRoutes } from './routes/user';
 import { MongoAnalyticsLogger } from './Utilities/AnalyticsLogger';
 import { stripeWebhookRouter } from './webhooks/stripeWebhooks';
 
+
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
 

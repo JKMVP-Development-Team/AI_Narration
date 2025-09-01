@@ -1,9 +1,8 @@
 import { Router, Request, Response } from 'express';
-import multer, {FileFilterCallback} from 'multer';
+import multer from 'multer';
 import { ttsService } from '../services/ttsService';
 import { 
   TTSRequest, 
-  VoiceTrainingRequest, 
   ApiResponse 
 } from '@shared/types/tts';
 
@@ -16,7 +15,6 @@ const upload = multer({
     fileSize: 30 * 1024 * 1024, // 30MB max
   },
   fileFilter: (req, file, cb) => {
-    // Accept only audio files
     if (file.mimetype.startsWith('audio/')) {
       cb(null, true);
     } else {
@@ -48,8 +46,7 @@ router.get('/presets', async (req: Request, res: Response) => {
 
 // Get specific voice preset
 router.get('/presets/:id', async (req: Request, res: Response) => {
-  try 
-  {
+  try {
     const { id } = req.params;
     const preset = ttsService.getVoicePresetById(id);
     
@@ -78,7 +75,7 @@ router.get('/presets/:id', async (req: Request, res: Response) => {
   }
 });
 
-// Generate speech with preset
+// Generate speech with preset or custom voice
 router.post('/speak', async (req: Request, res: Response) => {
   try {
     const ttsRequest: TTSRequest = req.body;
@@ -125,48 +122,52 @@ router.post('/speak', async (req: Request, res: Response) => {
   }
 });
 
-//TODO: figure out how we can take input, where to store it, and how to process it
-// Generate speech with uploaded voice
-router.post('/speak-custom', async (req: Request, res: Response) => {
+// Generate speech with uploaded voice file (upload + generate in one step)
+router.post('/speak-with-voice', upload.single('voiceFile'), async (req: Request, res: Response) => {
   try {
-    const { text, userId, voiceId, language = 'en' } = req.body;
+    const { text, language = 'en' } = req.body;
+    const file = req.file;
     
-    if (!text || !userId || !voiceId) {
+    if (!text) {
       const response: ApiResponse = {
         success: false,
-        error: 'text, userId, and voiceId are required'
+        error: 'text is required'
       };
       return res.status(400).json(response);
     }
 
-    const customVoiceFile = `/app/speakers/user-uploads/${userId}_${voiceId}.wav`; //an assumption
-    
-    const ttsRequest: TTSRequest = {
-      text,
-      customVoiceFile,
-      language
-    };
+    if (!file) {
+      const response: ApiResponse = {
+        success: false,
+        error: 'voiceFile is required'
+      };
+      return res.status(400).json(response);
+    }
 
-    const result = await ttsService.generateSpeech(ttsRequest);
+    const result = await ttsService.generateSpeechWithUploadedVoice(
+      text,
+      file.buffer,
+      language
+    );
     
     if (result.success) {
       const response: ApiResponse = {
         success: true,
         data: result,
-        message: 'Speech generated with custom voice successfully'
+        message: 'Speech generated with uploaded voice successfully'
       };
       res.json(response);
     } else {
       const response: ApiResponse = {
         success: false,
-        error: result.error || 'Custom speech generation failed'
+        error: result.error || 'Speech generation with uploaded voice failed'
       };
       res.status(500).json(response);
     }
   } catch (error: any) {
     const response: ApiResponse = {
       success: false,
-      error: error.message || 'Custom speech generation failed'
+      error: error.message || 'Speech generation with uploaded voice failed'
     };
     res.status(500).json(response);
   }
