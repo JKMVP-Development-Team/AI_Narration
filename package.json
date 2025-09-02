@@ -11,15 +11,15 @@
     "dev:api": "nodemon apps/api/src/index.ts",
     "dev:frontend": "vite apps/frontend --port 3000",
     "build": "npm run build:api && npm run build:frontend",
-    "build:api": "cd apps/api && npm run build",
-    "build:frontend": "cd apps/frontend && npm run build",
+    "build:api": "tsc --project tsconfig.api.json",
+    "build:frontend": "vite build --config vite.config.ts",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "start:api": "cd apps/api && npm start",
-    "start:frontend": "cd apps/frontend && npm run preview"
+    "start:api": "node dist/api/apps/api/src/index.js",
+    "start:frontend": "vite preview apps/frontend --config vite.config.ts"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.45.0",

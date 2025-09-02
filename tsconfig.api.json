@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist/api",
+    "noEmit": false
+  },
+  "include": [
+    "apps/api/**/*",
+    "packages/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "apps/frontend/**/*",
+    "tests/**/*"
+  ]
+}
