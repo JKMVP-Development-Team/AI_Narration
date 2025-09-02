@@ -1,7 +1,5 @@
 name: CI Pipeline
 
-# Required GitHub Secrets:
-# - VITE_CLERK_PUBLISHABLE_KEY: Your Clerk publishable key for frontend builds
 
 on:
   push:
