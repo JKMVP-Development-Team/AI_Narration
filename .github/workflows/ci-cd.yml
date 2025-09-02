@@ -3,7 +3,7 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, End-to-End-Unit-Testing ]
   pull_request:
     branches: [ main ]
 
@@ -14,7 +14,7 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,8 +25,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Clean install dependencies
+        run: |
+          rm -rf node_modules package-lock.json
+          npm cache clean --force
+          npm install
 
       - name: Run unit tests
         run: npm run test
@@ -45,10 +48,10 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: unit-tests
-    
+
     env:
       VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -59,8 +62,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Clean install dependencies
+        run: |
+          npm cache clean --force
+          rm -rf node_modules package-lock.json
+          npm install
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
@@ -86,13 +92,6 @@ jobs:
         env:
           CI: true
 
-      - name: Cleanup processes
-        if: always()
-        run: |
-            if [ ! -z "$API_PID" ]; then kill $API_PID || true; fi
-            if [ ! -z "$FRONTEND_PID" ]; then kill $FRONTEND_PID || true; fi
-
-
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
         if: always()
@@ -106,10 +105,10 @@ jobs:
     name: Build Check
     runs-on: ubuntu-latest
     needs: [unit-tests, e2e-tests]
-    
+
     env:
       VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -120,8 +119,11 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Clean install dependencies
+        run: |
+          npm cache clean --force
+          rm -rf node_modules package-lock.json
+          npm install
 
       - name: Create .env file
         run: |
@@ -146,7 +148,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [unit-tests, e2e-tests, build-check]
     if: success()
-    
+
     steps:
       - name: Success notification
         run: |
@@ -154,4 +156,3 @@ jobs:
           echo "✅ Unit tests completed"
           echo "✅ E2E tests completed"
           echo "✅ Build check completed"
-          echo "🚀 Ready for deployment when you're ready!"
