@@ -3,7 +3,7 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main, End-to-End-Unit-Testing ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -25,11 +25,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Clean install dependencies
-        run: |
-          rm -rf node_modules package-lock.json
-          npm cache clean --force
-          npm install
+      - name: Install dependencies
+        run: npm ci
 
       - name: Run unit tests
         run: npm run test
@@ -50,7 +47,6 @@ jobs:
     needs: unit-tests
     
     env:
-      # Environment variables for frontend build
       VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
     
     steps:
@@ -63,11 +59,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Clean install dependencies
-        run: |
-          npm cache clean --force
-          rm -rf node_modules package-lock.json
-          npm install
+      - name: Install dependencies
+        run: npm ci
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
@@ -83,11 +76,8 @@ jobs:
 
       - name: Start applications for testing
         run: |
-          # Start API in background
           npm run start:api &
-          # Start frontend in background  
           npm run start:frontend &
-          # Wait for services to be ready
           sleep 10
         timeout-minutes: 2
 
@@ -95,6 +85,13 @@ jobs:
         run: npm run test:e2e
         env:
           CI: true
+
+      - name: Cleanup processes
+        if: always()
+        run: |
+            if [ ! -z "$API_PID" ]; then kill $API_PID || true; fi
+            if [ ! -z "$FRONTEND_PID" ]; then kill $FRONTEND_PID || true; fi
+
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
@@ -111,7 +108,6 @@ jobs:
     needs: [unit-tests, e2e-tests]
     
     env:
-      # Environment variables for frontend build
       VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
     
     steps:
@@ -124,11 +120,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Clean install dependencies
-        run: |
-          npm cache clean --force
-          rm -rf node_modules package-lock.json
-          npm install
+      - name: Install dependencies
+        run: npm ci
 
       - name: Create .env file
         run: |

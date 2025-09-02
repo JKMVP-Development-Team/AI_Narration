@@ -39,7 +39,7 @@ test.describe('AI Narration App', () => {
     });
     
     await page.goto('http://localhost:3000');
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle');
     
     // Should have no critical JavaScript errors
     expect(errors.filter(e => !e.includes('Warning'))).toHaveLength(0);
