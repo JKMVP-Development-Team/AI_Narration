@@ -1,12 +1,16 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import * as path from 'path';
+import { clerkMiddleware } from '@clerk/express';
 import { ttsRoutes } from './routes/tts';
 import { stripeRoutes } from './routes/stripe';
 import { userRoutes } from './routes/user';
 import { MongoAnalyticsLogger } from './Utilities/AnalyticsLogger';
 import { stripeWebhookRouter } from './webhooks/stripeWebhooks';
+import { clerkWebhookRouter } from './webhooks/clerkWebhooks';
+import { requireAuth, AuthenticatedRequest } from './middleware/auth';
+
 
 
 // Load environment variables
@@ -20,23 +24,29 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
+app.use(clerkMiddleware());
 
+
+
+// Webhook routes (must come before express.json middleware)
 app.use('/webhooks', stripeWebhookRouter);
+app.use('/webhooks', clerkWebhookRouter);
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Routes
-app.use('/api/tts', ttsRoutes);
-app.use('/api/stripe', stripeRoutes);
-app.use('/api/user', userRoutes);
 
-// TODO: Extract these /api/v1/ endpoints to separate route files
-// Then use: app.use('/api/v1', v1Routes);
+// Routes
+// To protect the routes, use the requireAuth middleware by redirecting users to sign in if they are not authenticated.
+app.use('/api/tts', requireAuth, ttsRoutes);
+app.use('/api/stripe', requireAuth, stripeRoutes);
+app.use('/api/user', requireAuth, userRoutes);
+
+// TODO Add requireAuth() for data analytics routes when ready
 
 // ========== V1 API ENDPOINTS (Ready for extraction) ==========
 
-app.get('/api/v1/analytics/user/:userId/daily/:date', async (req, res) => {
+app.get('/api/v1/analytics/user/:userId/daily/:date', requireAuth, async (req, res) => {
   try {
     const { userId, date } = req.params;
     const analytics = new MongoAnalyticsLogger();
@@ -47,19 +57,23 @@ app.get('/api/v1/analytics/user/:userId/daily/:date', async (req, res) => {
   }
 });
 
-app.get('/api/v1/analytics/user/:userId/summary', async (req, res) => {
+app.get('/api/v1/analytics/user/:userId/summary', requireAuth, async (req, res) => {
   try {
     const { userId } = req.params;
-    const days = req.query.days ? Number(req.query.days) : 30;
+    const { startDate, endDate } = req.query;
     const analytics = new MongoAnalyticsLogger();
-    const summary = await analytics.getUserUsageSummary(userId, days);
+    const summary = await analytics.getUserUsageSummaryStats(
+      userId, 
+      startDate as Date | undefined, 
+      endDate as Date | undefined
+    );
     res.json(summary);
   } catch (error) {
     res.status(500).json({ error: 'Failed to get user summary' });
   }
 });
 
-app.get('/api/v1/analytics/users/top', async (req, res) => {
+app.get('/api/v1/analytics/users/top', requireAuth, async (req, res) => {
   try {
     const days = req.query.days ? Number(req.query.days) : 30;
     const limit = req.query.limit ? Number(req.query.limit) : 10;

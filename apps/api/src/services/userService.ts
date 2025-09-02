@@ -2,7 +2,6 @@
 import {
     UserAccount,
     CreditPurchase,
-    UserAddress
 } from '@shared/types/user';
 
 import { ObjectId } from 'mongodb';
@@ -11,11 +10,12 @@ import { getStripeInstance, createStripeCustomer, deleteStripeCustomer, getStrip
 
 
 export async function createOrUpdateUser(data: {
-    userId?: string;
-    name: string;
+    clerkId?: string;
+    firstName?: string;
+    lastName?: string;
     email: string;
-    address: UserAddress;
     stripeCustomerId?: string;
+    userId?: string;
 }): Promise<UserAccount> {
     try {
         const db = DatabaseService.getInstance();
@@ -23,7 +23,14 @@ export async function createOrUpdateUser(data: {
 
         let existingUser = null;
 
-        existingUser = await usersCollection.findOne({ email: data.email });
+        // Try to find by clerkId first, then email, then userId
+        if (data.clerkId) {
+            existingUser = await usersCollection.findOne({ clerkId: data.clerkId });
+        }
+        
+        if (!existingUser) {
+            existingUser = await usersCollection.findOne({ email: data.email });
+        }
 
         if (!existingUser && data.userId) {
             try {
@@ -35,15 +42,25 @@ export async function createOrUpdateUser(data: {
 
         if (existingUser) {
             console.log(`Found existing user: ${existingUser._id} for email: ${data.email}`);
+            
+            // Prepare update data
+            const updateData: any = {
+                email: data.email,
+                updatedAt: new Date()
+            };
+
+            if (data.firstName || data.lastName) {
+                updateData.firstName = data.firstName;
+                updateData.lastName = data.lastName;
+            } 
+
+            if (data.clerkId) {
+                updateData.clerkId = data.clerkId;
+            }
+
             const updatedResult = await usersCollection.updateOne(
                 { _id: existingUser._id },
-                {
-                    $set: {
-                        name: data.name,
-                        email: data.email,
-                        updatedAt: new Date()
-                    }
-                }
+                { $set: updateData }
             );
 
             const updatedUser = await usersCollection.findOne({ _id: existingUser._id });
@@ -55,8 +72,10 @@ export async function createOrUpdateUser(data: {
             
             const user: UserAccount = {
                 _id: updatedUser._id.toString(),
-                name: updatedUser.name,
+                firstName: updatedUser.firstName,
+                lastName: updatedUser.lastName,
                 email: updatedUser.email,
+                clerkId: updatedUser.clerkId,
                 stripeCustomerId: updatedUser.stripeCustomerId,
                 credits: updatedUser.credits,
                 totalCreditsEverPurchased: updatedUser.totalCreditsEverPurchased,
@@ -75,7 +94,7 @@ export async function createOrUpdateUser(data: {
 
             if (!stripeCustomer) {
                 console.log('No Stripe customer found, creating new one...');
-                const stripeCustomerId = await createStripeCustomer(user, data.address);
+                const stripeCustomerId = await createStripeCustomer(user);
                 if (stripeCustomerId) {
                     await usersCollection.updateOne(
                         { _id: updatedUser._id },
@@ -91,7 +110,8 @@ export async function createOrUpdateUser(data: {
 
             await logUserActivity(user._id!, 'user_updated', {
                 email: data.email,
-                name: data.name,
+                firstName: data.firstName,
+                lastName: data.lastName,
                 hasStripeCustomer: !!user.stripeCustomerId,
                 stripeCustomerRecreated: !!(!stripeCustomer && user.stripeCustomerId)
             });
@@ -104,10 +124,12 @@ export async function createOrUpdateUser(data: {
         console.log(`✨ Creating NEW user for email: ${data.email}`);
         
         const newUser = {
-            name: data.name,
+            firstName: data.firstName,
+            lastName: data.lastName,
             email: data.email,
+            clerkId: data.clerkId,
             stripeCustomerId: '',
-            credits: 0,
+            credits: 100, // Default free credits
             totalCreditsEverPurchased: 0,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -123,12 +145,22 @@ export async function createOrUpdateUser(data: {
         // Create Stripe customer with the new MongoDB _id
         const userForStripe: UserAccount = {
             _id: userId,
-            ...newUser
+            firstName: newUser.firstName,
+            lastName: newUser.lastName,
+            email: newUser.email,
+            clerkId: newUser.clerkId || '',
+            stripeCustomerId: '',
+            credits: newUser.credits,
+            totalCreditsEverPurchased: newUser.totalCreditsEverPurchased,
+            createdAt: newUser.createdAt,
+            updatedAt: newUser.updatedAt,
+            lastPurchaseAt: newUser.lastPurchaseAt,
+            status: newUser.status
         };
 
         console.log('🔄 Creating Stripe customer for new user:', userForStripe);
 
-        const stripeCustomerId = await createStripeCustomer(userForStripe, data.address);
+        const stripeCustomerId = await createStripeCustomer(userForStripe);
         if (stripeCustomerId) {
             await usersCollection.updateOne(
                 { _id: result.insertedId },
@@ -140,7 +172,8 @@ export async function createOrUpdateUser(data: {
 
         await logUserActivity(userId, 'user_created', {
             email: data.email,
-            name: data.name,
+            firstName: data.firstName,
+            lastName: data.lastName,
             hasStripeCustomer: !!stripeCustomerId
         });
 
@@ -213,7 +246,9 @@ export async function addCreditsToUser(userId: string, credits: number): Promise
         console.log(`Added ${credits} credits to user ${userId}. New balance: ${userDocument.credits}`);
         return {
             _id: userDocument._id.toString(),
-            name: userDocument.name,
+            firstName: userDocument.firstName,
+            lastName: userDocument.lastName,
+            clerkId: userDocument.clerkId,
             email: userDocument.email,
             stripeCustomerId: userDocument.stripeCustomerId,
             credits: userDocument.credits,
@@ -249,28 +284,46 @@ export async function deductCreditsFromUser(userId: string, credits: number): Pr
             $inc: { credits: -credits },
             $set: { updatedAt: new Date() }
         },
-        { returnDocument: 'after' }
+        { 
+            returnDocument: 'after',
+            includeResultMetadata: true
+         }
     );
 
-    if (!updatedUser || !updatedUser.value) {
+    const userDocument = updatedUser?.value;
+
+    if (userDocument) {
+        console.log('User AFTER update:', {
+            _id: userDocument._id,
+            credits: userDocument.credits,
+            totalCreditsEverPurchased: userDocument.totalCreditsEverPurchased
+        });
+    } else {
+        console.error('No value returned from update operation');
+        console.error('Full updatedUser object:', updatedUser);
+    }
+
+    if (!userDocument) {
         console.error(`Failed to update user credits for user ${userId}.`);
         return null;
     }
 
-    console.log(`Deducted ${credits} credits from user ${userId}. New balance: ${updatedUser.value.credits}`);
+    console.log(`Deducted ${credits} credits from user ${userId}. New balance: ${userDocument.value.credits}`);
 
-    return {
-        _id: updatedUser._id.toString(),
-        name: updatedUser.name,
-        email: updatedUser.email,
-        stripeCustomerId: updatedUser.stripeCustomerId,
-        credits: updatedUser.credits,
-        totalCreditsEverPurchased: updatedUser.totalCreditsEverPurchased,
-        createdAt: updatedUser.createdAt,
-        updatedAt: updatedUser.updatedAt,
-        lastPurchaseAt: updatedUser.lastPurchaseAt,
-        status: updatedUser.status
-    }
+        return {
+            _id: userDocument._id.toString(),
+            firstName: userDocument.firstName,
+            lastName: userDocument.lastName,
+            clerkId: userDocument.clerkId,
+            email: userDocument.email,
+            stripeCustomerId: userDocument.stripeCustomerId,
+            credits: userDocument.credits,
+            totalCreditsEverPurchased: userDocument.totalCreditsEverPurchased,
+            createdAt: userDocument.createdAt,
+            updatedAt: userDocument.updatedAt,
+            lastPurchaseAt: userDocument.lastPurchaseAt,
+            status: userDocument.status
+        };
 }
 
 export async function getUserByUserId(userId: string): Promise<UserAccount | null> {
@@ -283,7 +336,9 @@ export async function getUserByUserId(userId: string): Promise<UserAccount | nul
 
     const mappedUser: UserAccount = {
         _id: user._id.toString(),
-        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        clerkId: user.clerkId,
         email: user.email,
         stripeCustomerId: user.stripeCustomerId,
         credits: user.credits,
@@ -322,7 +377,9 @@ export async function updateUserStatus(userId: string, status: 'active' | 'inact
 
     return {
         _id: updatedUser.value._id.toString(),
-        name: updatedUser.value.name,
+        firstName: updatedUser.value.firstName,
+        lastName: updatedUser.value.lastName,
+        clerkId: updatedUser.value.clerkId,
         email: updatedUser.value.email,
         stripeCustomerId: updatedUser.value.stripeCustomerId,
         credits: updatedUser.value.credits,
@@ -430,7 +487,9 @@ export async function deleteUserAndStripeCustomer(customerId: string): Promise<{
             success: true,
             deletedUser: {
                 _id: user._id.toString(),
-                name: user.name,
+                firstName: user.firstName,
+                lastName: user.lastName,
+                clerkId: user.clerkId,
                 email: user.email,
                 stripeCustomerId: user.stripeCustomerId,
                 credits: user.credits,
@@ -510,5 +569,170 @@ export async function getStripeCustomerTransactions(customerId: string, limit: n
     } catch (error) {
         console.error('Error fetching Stripe transactions:', error);
         return [];
+    }
+}
+
+// ========== CLERK WEBHOOK HANDLERS ==========
+
+/**
+ * Handle Clerk user creation webhook
+ */
+export async function handleClerkUserCreated(clerkUserId: string, userData: any): Promise<UserAccount> {
+    try {
+        const email = userData.email_addresses?.[0]?.email_address;
+        const firstName = userData.first_name;
+        const lastName = userData.last_name;
+
+        if (!email) {
+            throw new Error('User email is required');
+        }
+
+        console.log(`📝 Clerk user created: ${email}`);
+
+        // Use your existing createOrUpdateUser function
+        const user = await createOrUpdateUser({
+            clerkId: clerkUserId,
+            email,
+            firstName,
+            lastName,
+        });
+
+        await logUserActivity(user._id!, 'clerk_user_created', {
+            email,
+            firstName,
+            lastName,
+            clerkId: clerkUserId,
+        });
+
+        return user;
+
+    } catch (error) {
+        console.error('Error handling Clerk user creation:', error);
+        throw error;
+    }
+}
+
+/**
+ * Handle Clerk user sign in webhook
+ */
+export async function handleClerkUserSignedIn(clerkUserId: string, userData: any): Promise<UserAccount> {
+    try {
+        const email = userData.email_addresses?.[0]?.email_address || userData.email_address;
+
+        console.log(`🔐 Clerk user signed in: ${email}`);
+
+        // Use your existing createOrUpdateUser - it handles both create and update
+        const user = await createOrUpdateUser({
+            clerkId: clerkUserId,
+            email,
+            firstName: userData.first_name,
+            lastName: userData.last_name,
+        });
+
+        await logUserActivity(user._id!, 'clerk_user_signed_in', {
+            email,
+            clerkId: clerkUserId,
+        });
+
+        return user;
+
+    } catch (error) {
+        console.error('Error handling Clerk user sign in:', error);
+        throw error;
+    }
+}
+
+/**
+ * Handle Clerk user updates webhook
+ */
+export async function handleClerkUserUpdated(clerkUserId: string, userData: any): Promise<UserAccount> {
+    try {
+        const email = userData.email_addresses?.[0]?.email_address;
+
+        console.log(`📝 Clerk user updated: ${email}`);
+
+        // Use your existing createOrUpdateUser function
+        const user = await createOrUpdateUser({
+            clerkId: clerkUserId,
+            email,
+            firstName: userData.first_name,
+            lastName: userData.last_name,
+        });
+
+        await logUserActivity(user._id!, 'clerk_user_updated', {
+            email,
+            firstName: userData.first_name,
+            lastName: userData.last_name,
+            clerkId: clerkUserId,
+        });
+
+        return user;
+
+    } catch (error) {
+        console.error('Error handling Clerk user update:', error);
+        throw error;
+    }
+}
+
+/**
+ * Handle Clerk user deletion webhook
+ */
+export async function handleClerkUserDeleted(clerkUserId: string): Promise<void> {
+    try {
+        console.log(`🗑️ Clerk user deleted: ${clerkUserId}`);
+
+        // Find user by clerkId
+        const user = await getUserByClerkId(clerkUserId);
+        if (!user) {
+            console.log('User not found for deletion');
+            return;
+        }
+
+        await logUserActivity(user._id!, 'clerk_user_deleted', {
+            clerkId: clerkUserId,
+            email: user.email,
+        });
+
+        // Use your existing deletion function
+        if (user.stripeCustomerId) {
+            await deleteUserAndStripeCustomer(user.stripeCustomerId);
+        } else {
+            await deleteUserAndStripeCustomer(user._id!);
+        }
+
+    } catch (error) {
+        console.error('Error handling Clerk user deletion:', error);
+        throw error;
+    }
+}
+
+/**
+ * Get user by Clerk ID
+ */
+export async function getUserByClerkId(clerkId: string): Promise<UserAccount | null> {
+    try {
+        const db = DatabaseService.getInstance();
+        const usersCollection = await db.getCollection('users');
+        const user = await usersCollection.findOne({ clerkId });
+        
+        if (!user) return null;
+
+        return {
+            _id: user._id.toString(),
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            clerkId: user.clerkId,
+            stripeCustomerId: user.stripeCustomerId,
+            credits: user.credits,
+            totalCreditsEverPurchased: user.totalCreditsEverPurchased,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            lastPurchaseAt: user.lastPurchaseAt,
+            status: user.status
+        };
+    } catch (error) {
+        console.error('Error getting user by Clerk ID:', error);
+        return null;
     }
 }
