@@ -19,7 +19,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "start:api": "node dist/api/apps/api/src/index.js",
-    "start:frontend": "vite preview apps/frontend --config vite.config.ts"
+    "start:frontend": "vite preview --config vite.config.ts --port 3000"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.45.0",
