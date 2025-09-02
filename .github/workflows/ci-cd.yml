@@ -27,6 +27,7 @@ jobs:
       - name: Clean install dependencies
         run: |
           rm -rf node_modules package-lock.json
+          npm cache clean --force
           npm install
 
       - name: Run unit tests
@@ -59,6 +60,7 @@ jobs:
 
       - name: Clean install dependencies
         run: |
+          npm cache clean --force
           rm -rf node_modules package-lock.json
           npm install
 
@@ -111,6 +113,7 @@ jobs:
 
       - name: Clean install dependencies
         run: |
+          npm cache clean --force
           rm -rf node_modules package-lock.json
           npm install
 
