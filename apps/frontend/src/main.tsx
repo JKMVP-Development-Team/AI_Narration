@@ -5,7 +5,7 @@ import { ClerkProvider } from '@clerk/clerk-react'
 import App from './App'
 import LandingPage from "./LandingPage";
 import CreditHistory from './CreditHistory';
-import "./app.css";
+import "./App.css";
 
 import Signup from './Signup'
 import Login from './Login'
