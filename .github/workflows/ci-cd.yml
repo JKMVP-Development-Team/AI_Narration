@@ -25,8 +25,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies with rollup fix
+        run: |
+          npm ci --force || (
+            echo "npm ci failed, applying rollup fix..."
+            rm -rf node_modules package-lock.json
+            npm install
+          )
 
       - name: Run unit tests
         run: npm run test
@@ -59,8 +64,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies with rollup fix
+        run: |
+          npm ci --force || (
+            echo "npm ci failed, applying rollup fix..."
+            rm -rf node_modules package-lock.json
+            npm install
+          )
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps
@@ -120,8 +130,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies with rollup fix
+        run: |
+          npm ci --force || (
+            echo "npm ci failed, applying rollup fix..."
+            rm -rf node_modules package-lock.json
+            npm install
+          )
 
       - name: Create .env file
         run: |
