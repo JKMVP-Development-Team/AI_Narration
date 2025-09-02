@@ -9,7 +9,7 @@
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:worker\" \"npm run dev:frontend\"",
     "dev:api": "nodemon apps/api/src/index.ts",
     "dev:worker": "nodemon --exec ts-node apps/worker/src/index.ts",
-    "dev:frontend": "vite apps/frontend --port 3000",
+    "dev:frontend": "vite --port 3000",
     "build": "npm run build:api && npm run build:worker && npm run build:frontend",
     "build:api": "tsc --outDir dist/api --rootDir apps/api/src apps/api/src/index.ts",
     "build:worker": "tsc --outDir dist/worker --rootDir apps/worker/src apps/worker/src/index.ts",

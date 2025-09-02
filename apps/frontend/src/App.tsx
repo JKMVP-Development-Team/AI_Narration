@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
 
+// API Configuration
+const API_BASE_URL = '/api';
+
 // Placeholder structures, will import to a zod schema file
 
 // Voice preset data structure
 interface VoicePreset {
   id: string;
   name: string;
-  style: string;
-  gender: string;
-  accent: string;
   description: string;
+  filePath: string;
 }
 
 // Custom voice upload structure
@@ -60,27 +61,7 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null); // Still using alerts for now, will implement error when frontend is ready
-  const voicePresets: VoicePreset[] = [
-    // Voice presets data - hardcoded for now, will come from API later
-    {
-      id: "sarah",
-      name: "Sarah",
-      style: "Featured",
-      gender: "Female",
-      accent: "American",
-      description:
-        "Clear, professional voice perfect for business presentations",
-    },
-    {
-      id: "david",
-      name: "David",
-      style: "Professional",
-      gender: "Male",
-      accent: "British",
-      description:
-        "Clear, professional voice perfect for business presentations",
-    },
-  ];
+  const [voicePresets, setVoicePresets] = useState<VoicePreset[]>([]);
 
   // Text limits configuration
   const TEXT_LIMITS = {
@@ -105,13 +86,23 @@ function App() {
   // API ENDPOINT: GET /api/tts/presets
   const loadVoicePresets = async () => {
     try {
-      // TODO: Call API to fetch voice presets and update state with setVoicePresets
-      // Currently using hardcoded data
+      const response = await fetch(`${API_BASE_URL}/tts/presets`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setVoicePresets(data.data);
+        console.log(`Loaded ${data.data.length} voice presets from API:`, data.data);
+      } else {
+        throw new Error(data.error || 'Failed to load voice presets');
+      }
     } catch (err) {
-      alert(
-        err instanceof Error ? err.message : "Failed to load voice presets"
-      );
       console.error("Voice presets loading error:", err);
+      setVoicePresets([]); // Clear presets on error
     }
   };
 
@@ -158,14 +149,34 @@ function App() {
     const controller = new AbortController();
     setAbortController(controller);
 
-    try {
-      // TODO: Call API to generate speech and get the audio URL.
+try {
+  // Send the text and voice selection to the backend API to generate audio.
+  const response = await fetch(`${API_BASE_URL}/tts/speak`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      text: text.trim(),
+      voicePreset: selectedVoice,
+      language: 'en'
+    }),
+    signal: controller.signal
+  });
 
-      // CURRENT SIMULATION - REPLACE WITH ABOVE API CALL:
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      if (!controller.signal.aborted) {
-        setGeneratedAudioUrl("/mock.wav");
-      }
+  if (!response.ok) {
+    throw new Error(`HTTP error! Status: ${response.status}`);
+  }
+
+  const data = await response.json();
+  
+  if (data.success) {
+    setGeneratedAudioUrl(data.data.audioUrl);
+    console.log('Audio generated successfully:', data.data);
+    alert('Audio generated successfully!');
+  } else {
+    throw new Error(data.error || 'Generation failed');
+  }
 
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
@@ -199,16 +210,26 @@ function App() {
     setIsDownloading(true);
 
     try {
-      // TODO: Fetch the audio file from generatedAudioUrl to trigger a download
+      const response = await fetch(generatedAudioUrl);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch audio file');
+      }
 
-      // CURRENT SIMULATION - REPLACE WITH ABOVE API CALL:
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
       const link = document.createElement("a");
-      link.href = generatedAudioUrl;
+      link.href = url;
       link.download = `narration_${Date.now()}.wav`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      // Clean up the object URL
+      window.URL.revokeObjectURL(url);
+      
+      alert('Audio downloaded successfully!');
 
     } catch (err) {
       alert(err instanceof Error ? err.message : "Download failed");
@@ -218,7 +239,7 @@ function App() {
     }
   };
 
-  // API ENDPOINT: POST /api/tts/upload-voice
+  // Custom voice upload - NOT IMPLEMENTED YET
   const handleCustomVoiceUpload = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -284,10 +305,34 @@ function App() {
     e.stopPropagation();
 
     try {
-      // TODO: Call API to get a preview audio URL and play it.
+      // Use the speak endpoint with a short preview text
+      const previewText = "Hello, this is a preview of my voice.";
+      
+      const response = await fetch(`${API_BASE_URL}/tts/speak`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: previewText,
+          voicePreset: voiceId,
+          language: 'en'
+        })
+      });
 
-      // CURRENT SIMULATION - REPLACE WITH ABOVE API CALL:
-      alert(`${voiceName} preview`);
+      const data = await response.json();
+      
+      if (data.success) {
+        // Play the audio immediately
+        const audio = new Audio(data.data.audioUrl);
+        audio.volume = 0.7;
+        audio.play().catch(err => {
+          console.error('Audio playback failed:', err);
+          alert(`Could not play preview for ${voiceName}. ${err.message}`);
+        });
+      } else {
+        throw new Error(data.error || 'Preview generation failed');
+      }
 
     } catch (err) {
       alert(err instanceof Error ? err.message : "Preview failed");
@@ -438,7 +483,7 @@ function App() {
               onClick={() => handleVoiceSelect(voice.id)}
             >
               <div className="preset-header">
-                <span className="preset-style">{voice.style}</span>
+                <span className="preset-style">Professional</span>
                 <div className="preset-actions">
                   <button
                     className="preview-btn"
@@ -454,10 +499,6 @@ function App() {
 
               <div className="preset-content">
                 <h3 className="preset-name">{voice.name}</h3>
-                <div className="preset-details">
-                  <span className="preset-gender">{voice.gender}</span>
-                  <span className="preset-accent">{voice.accent}</span>
-                </div>
                 <p className="preset-description">{voice.description}</p>
               </div>
             </div>

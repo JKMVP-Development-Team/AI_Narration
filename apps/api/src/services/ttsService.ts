@@ -232,10 +232,10 @@ export class TTSService {
       // Save uploaded voice to temp file
       fs.writeFileSync(tempVoiceFile, voiceBuffer);
 
-      // Generate TTS using the temp voice file
+      // Generate TTS using the temp voice file - use container path
       const xttsRequest: XTTSApiRequest = {
         text,
-        speaker_wav: tempVoiceFile,
+        speaker_wav: `/app/xtts-data/output/temp/${tempFilename}`, // Simple container path
         language
       };
 
