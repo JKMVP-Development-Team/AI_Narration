@@ -3,7 +3,7 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, End-to-End-Unit-Testing ]
   pull_request:
     branches: [ main ]
 
