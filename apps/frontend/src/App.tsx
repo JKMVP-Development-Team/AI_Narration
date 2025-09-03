@@ -46,7 +46,7 @@ function App() {
   const [text, setText] = useState(
     "Welcome to the AI Narration App! This dark mode interface is designed for comfortable extended use. Enter your text and let our AI create beautiful narration for you."
   );
-  const [selectedVoice, setSelectedVoice] = useState<string | null>("sarah");
+  const [selectedVoice, setSelectedVoice] = useState<string | null>("josh");
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(
     null
   );
@@ -239,7 +239,7 @@ try {
     }
   };
 
-  // Custom voice upload - NOT IMPLEMENTED YET
+// Custom voice upload - Uploads a file and generates narration in one step
   const handleCustomVoiceUpload = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -263,13 +263,35 @@ try {
 
     // Set uploading state
     setIsUploading(true);
+    setGeneratedAudioUrl(null); // Clear any previous audio
+
+    // Create a FormData object to send the file and text together
+    const formData = new FormData();
+    formData.append('voiceFile', file);
+    formData.append('text', text.trim());
+    formData.append('language', 'en');
 
     try {
-      // TODO: Call API to upload the voice file and get back the voice details.
+      // Send the form data to the dedicated backend endpoint
+      const response = await fetch(`${API_BASE_URL}/tts/speak-with-voice`, {
+        method: 'POST',
+        body: formData, // The browser automatically sets the correct 'Content-Type' for FormData
+      });
 
-      // CURRENT SIMULATION - REPLACE WITH ABOVE API CALL:
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      alert(`Custom voice "${file.name}" uploaded!`);
+      // Standard error handling for network issues
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Handle the API's specific success/error response
+      if (data.success) {
+        setGeneratedAudioUrl(data.data.audioUrl);
+        alert('Narration generated successfully with your custom voice!');
+      } else {
+        throw new Error(data.error || 'Custom voice generation failed');
+      }
 
     } catch (err) {
       alert(err instanceof Error ? err.message : "Upload failed");
@@ -296,7 +318,7 @@ try {
     setGeneratedAudioUrl(null);
   };
 
-  // Preview voice; API ENDPOINT: POST /api/tts/preview
+  // Preview voice - plays existing sample files
   const handlePreview = async (
     voiceId: string,
     voiceName: string,
@@ -305,34 +327,15 @@ try {
     e.stopPropagation();
 
     try {
-      // Use the speak endpoint with a short preview text
-      const previewText = "Hello, this is a preview of my voice.";
+      const sampleUrl = `${API_BASE_URL}/tts/audio/samples/${voiceName}.wav`;
       
-      const response = await fetch(`${API_BASE_URL}/tts/speak`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: previewText,
-          voicePreset: voiceId,
-          language: 'en'
-        })
+      const audio = new Audio(sampleUrl);
+      audio.volume = 0.7;
+      audio.playbackRate = 1.25; // Set playback speed to 1.25x
+      audio.play().catch(err => {
+        console.error('Sample playback failed:', err);
+        alert(`Could not play preview for ${voiceName}.`);
       });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        // Play the audio immediately
-        const audio = new Audio(data.data.audioUrl);
-        audio.volume = 0.7;
-        audio.play().catch(err => {
-          console.error('Audio playback failed:', err);
-          alert(`Could not play preview for ${voiceName}. ${err.message}`);
-        });
-      } else {
-        throw new Error(data.error || 'Preview generation failed');
-      }
 
     } catch (err) {
       alert(err instanceof Error ? err.message : "Preview failed");
@@ -459,10 +462,19 @@ try {
       {generatedAudioUrl && (
         <div className="audio-player">
           <h3>Generated Audio</h3>
-          <audio controls style={{ width: "100%", marginTop: "10px" }}>
+          <audio controls style={{ width: "100%", marginTop: "10px" }}
+            onLoadedData={(e) => {
+              // Set default playback speed to 1.25x
+              const audioElement = e.target as HTMLAudioElement;
+              audioElement.playbackRate = 1.25;
+            }}
+          >
             <source src={generatedAudioUrl} type="audio/wav" />
             Your browser does not support the audio element.
           </audio>
+          <div style={{ marginTop: "8px", fontSize: "14px", color: "#888" }}>
+            💡 Tip: Use browser controls to adjust playback speed (default: 1.25x)
+          </div>
         </div>
       )}
 

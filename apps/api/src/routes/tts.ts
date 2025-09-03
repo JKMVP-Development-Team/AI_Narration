@@ -211,6 +211,23 @@ router.get('/audio/:filename', async (req: Request, res: Response) => {
   }
 });
 
+// Serve sample audio files for voice previews
+router.get('/audio/samples/:filename', (req: Request, res: Response) => {
+  const { filename } = req.params;
+  
+  if (!/^[a-zA-Z0-9_-]+\.(wav|mp3)$/.test(filename)) {
+    return res.status(400).json({ success: false, error: 'Invalid filename' });
+  }
+
+  const sampleBuffer = ttsService.getSampleFile(filename);
+  
+  if (!sampleBuffer) {
+    return res.status(404).json({ success: false, error: 'Sample file not found' });
+  }
+
+  res.set('Content-Type', 'audio/wav').send(sampleBuffer);
+});
+
 // Health check endpoint
 router.get('/health', (req: Request, res: Response) => {
   res.json({

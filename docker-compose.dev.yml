@@ -5,9 +5,7 @@ services:
     ports:
       - "8020:8020"
     volumes:
-      - ./xtts-data/speakers:/app/speakers
-      - ./xtts-data/models:/app/models
-      - ./xtts-data/output:/app/output
+      - ./xtts-data:/app/xtts-data
     environment:
       - DEVICE=cpu
     restart: unless-stopped

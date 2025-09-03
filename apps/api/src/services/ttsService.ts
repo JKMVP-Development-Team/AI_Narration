@@ -34,106 +34,36 @@ export class TTSService {
     this.presetsDir = path.join(this.speakersDir, 'presets');
     
     // API paths
-    this.presetsPath = '/app/speakers/presets';
-    this.userUploadsPath = '/app/speakers/user-uploads';
+    this.presetsPath = '/app/xtts-data/speakers/presets';
+    this.userUploadsPath = '/app/xtts-data/speakers/user-uploads';
   }
 
   // Voice presets management
   public getVoicePresets(): VoicePreset[] {
-    const presets: VoicePreset[] = [
-      {
-        id: 'josh',
-        name: 'Josh',
-        description: 'American, male, Pittsburgh, Pennsylvania, USA',
-        filePath: `${this.presetsPath}/josh.wav`
-      },
-      {
-        id: 'emily',
-        name: 'Emily',
-        description: 'British, female, Birmingham, UK',
-        filePath: `${this.presetsPath}/emily.wav`
-      },
-      {
-        id: 'liam',
-        name: 'Liam',
-        description: 'Australian, male, Brisbane, Australia',
-        filePath: `${this.presetsPath}/liam.wav`
-      },
-      {
-        id: 'mariah',
-        name: 'Mariah',
-        description: 'Jamaican, female, Saint Anne\'s Bay, Jamaica',
-        filePath: `${this.presetsPath}/mariah.wav`
-      },
-      {
-        id: 'daniel',
-        name: 'Daniel',
-        description: 'American, male, Fairfax, Virginia, USA',
-        filePath: `${this.presetsPath}/daniel.wav`
-      },
-      {
-        id: 'jessica',
-        name: 'Jessica',
-        description: 'American, female, Brooklyn, New York, USA',
-        filePath: `${this.presetsPath}/jessica.wav`
-      },
-      {
-        id: 'marcus',
-        name: 'Marcus',
-        description: 'American, male, Macon, Mississippi, USA',
-        filePath: `${this.presetsPath}/marcus.wav`
-      },
-      {
-        id: 'chloe',
-        name: 'Chloe',
-        description: 'Australian, female, Perth, Australia',
-        filePath: `${this.presetsPath}/chloe.wav`
-      },
-      {
-        id: 'sarah',
-        name: 'Sarah',
-        description: 'American, female, Carthage, Texas, USA',
-        filePath: `${this.presetsPath}/sarah.wav`
-      },
-      {
-        id: 'hannah',
-        name: 'Hannah',
-        description: 'American, female, Davenport, Iowa, USA',
-        filePath: `${this.presetsPath}/hannah.wav`
-      },
-      {
-        id: 'sophie',
-        name: 'Sophie',
-        description: 'British, female, Staffordshire, UK',
-        filePath: `${this.presetsPath}/sophie.wav`
-      },
-      {
-        id: 'lucy',
-        name: 'Lucy',
-        description: 'British, female, Leicester, UK',
-        filePath: `${this.presetsPath}/lucy.wav`
-      },
-      {
-        id: 'oliver',
-        name: 'Oliver',
-        description: 'British, male, Henley-on-Thames, Oxfordshire, UK',
-        filePath: `${this.presetsPath}/oliver.wav`
-      },
-      {
-        id: 'connor',
-        name: 'Connor',
-        description: 'Northern Irish, male, Belfast, Northern Ireland, UK',
-        filePath: `${this.presetsPath}/connor.wav`
-      },
-      {
-        id: 'madison',
-        name: 'Madison',
-        description: 'American, female, Norton, Virginia, USA',
-        filePath: `${this.presetsPath}/madison.wav`
-      }
+    const presetData = [
+      { id: 'josh', name: 'Josh', description: 'American, male, Pittsburgh, Pennsylvania, USA' },
+      { id: 'emily', name: 'Emily', description: 'British, female, Birmingham, UK' },
+      { id: 'liam', name: 'Liam', description: 'Australian, male, Brisbane, Australia' },
+      { id: 'mariah', name: 'Mariah', description: 'Jamaican, female, Saint Anne\'s Bay, Jamaica' },
+      { id: 'daniel', name: 'Daniel', description: 'American, male, Fairfax, Virginia, USA' },
+      { id: 'jessica', name: 'Jessica', description: 'American, female, Brooklyn, New York, USA' },
+      { id: 'marcus', name: 'Marcus', description: 'American, male, Macon, Mississippi, USA' },
+      { id: 'chloe', name: 'Chloe', description: 'Australian, female, Perth, Australia' },
+      { id: 'sarah', name: 'Sarah', description: 'American, female, Carthage, Texas, USA' },
+      { id: 'hannah', name: 'Hannah', description: 'American, female, Davenport, Iowa, USA' },
+      { id: 'sophie', name: 'Sophie', description: 'British, female, Staffordshire, UK' },
+      { id: 'lucy', name: 'Lucy', description: 'British, female, Leicester, UK' },
+      { id: 'oliver', name: 'Oliver', description: 'British, male, Henley-on-Thames, Oxfordshire, UK' },
+      { id: 'connor', name: 'Connor', description: 'Northern Irish, male, Belfast, Northern Ireland, UK' },
+      { id: 'madison', name: 'Madison', description: 'American, female, Norton, Virginia, USA' },
     ];
-
-    return presets;
+    
+    // Map over the data to add the correct, dynamic filePath for the container
+    return presetData.map(p => ({
+      ...p,
+      // This assumes your preset audio files are named like 'Sarah.wav', 'Josh.wav', etc.
+      filePath: `${this.presetsPath}/${p.name}.wav`
+    }));
   }
 
   public getVoicePresetById(id: string): VoicePreset | null {
@@ -291,6 +221,18 @@ export class TTSService {
   // Audio file serving
   public getAudioFile(filename: string): Buffer | null {
     const filePath = path.join(this.tempDir, filename);
+    
+    if (fs.existsSync(filePath)) {
+      return fs.readFileSync(filePath);
+    }
+    
+    return null;
+  }
+
+  // Sample file serving for voice previews
+  public getSampleFile(filename: string): Buffer | null {
+    const samplesDir = path.join(this.speakersDir, 'samples');
+    const filePath = path.join(samplesDir, filename);
     
     if (fs.existsSync(filePath)) {
       return fs.readFileSync(filePath);
