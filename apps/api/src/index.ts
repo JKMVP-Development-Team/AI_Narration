@@ -26,6 +26,9 @@ app.use('/webhooks', stripeWebhookRouter);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Static file serving for sample audio files
+app.use('/api/tts/audio/samples', express.static(path.join(__dirname, '../../../xtts-data/speakers/samples')));
+
 // Routes
 app.use('/api/tts', ttsRoutes);
 app.use('/api/stripe', stripeRoutes);

@@ -229,18 +229,6 @@ export class TTSService {
     return null;
   }
 
-  // Sample file serving for voice previews
-  public getSampleFile(filename: string): Buffer | null {
-    const samplesDir = path.join(this.speakersDir, 'samples');
-    const filePath = path.join(samplesDir, filename);
-    
-    if (fs.existsSync(filePath)) {
-      return fs.readFileSync(filePath);
-    }
-    
-    return null;
-  }
-
   // Cleanup temporary files
   public cleanupTempFiles(olderThanMinutes: number = 60): void {
     const cutoffTime = Date.now() - (olderThanMinutes * 60 * 1000);
