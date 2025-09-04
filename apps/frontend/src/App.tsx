@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import "./App.css";
 import { apiService, VoicePreset } from "./services/apiService";
 
-// Placeholder structures, will import to a zod schema file
 
 function App() {
   // State for text input and selected voice
@@ -349,7 +348,7 @@ function App() {
           {isGenerating ? "Generating..." : "Generate Narration"}
         </button>
 
-        {/* Placeholder cancel button appears during generation */}
+        {/* Cancel button appears during generation */}
         {isGenerating && (
           <button
             className="cancel-btn"

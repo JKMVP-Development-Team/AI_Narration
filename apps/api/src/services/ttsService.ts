@@ -2,6 +2,7 @@ import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   XTTSApiRequest, 
@@ -36,6 +37,17 @@ export class TTSService {
     // API paths
     this.presetsPath = '/app/xtts-data/speakers/presets';
     this.userUploadsPath = '/app/xtts-data/speakers/user-uploads';
+  }
+
+  // Generate cache key for audio caching
+  private generateCacheKey(text: string, voiceId: string, language: string): string {
+    const content = `${text.trim()}|${voiceId}|${language}`;
+    return crypto.createHash('sha256').update(content).digest('hex');
+  }
+
+  // Check if cached audio file exists
+  private getCachedAudioPath(cacheKey: string): string {
+    return path.join(this.tempDir, `cached_${cacheKey}.wav`);
   }
 
   // Voice presets management
@@ -75,6 +87,7 @@ export class TTSService {
   public async generateSpeech(request: TTSRequest): Promise<TTSResponse> {
     try {
       let speakerWavPath: string;
+      let voiceId: string;
 
       if (request.voicePreset) {
         const preset = this.getVoicePresetById(request.voicePreset);
@@ -86,15 +99,40 @@ export class TTSService {
         }
 
         speakerWavPath = preset.filePath;
+        voiceId = request.voicePreset;
 
       } else if (request.customVoiceFile) {
         speakerWavPath = request.customVoiceFile;
+        voiceId = 'custom';
       } else {
         return {
           success: false,
           error: 'Either voicePreset or customVoiceFile must be provided'
         };
       }
+
+      // Generate cache key and check for existing cached file
+      const cacheKey = this.generateCacheKey(request.text, voiceId, request.language || 'en');
+      const cachedFilePath = this.getCachedAudioPath(cacheKey);
+      const filename = `cached_${cacheKey}.wav`;
+
+      // Check if cached file exists
+      if (fs.existsSync(cachedFilePath)) {
+        console.log(`Cache hit for key: ${cacheKey}`);
+        const stats = fs.statSync(cachedFilePath);
+        
+        return {
+          success: true,
+          audioUrl: `/api/tts/audio/${filename}`,
+          metadata: {
+            duration: 0,
+            fileSize: stats.size,
+            format: 'wav'
+          }
+        };
+      }
+
+      console.log(`Cache miss for key: ${cacheKey}, generating new audio...`);
 
       const xttsRequest: XTTSApiRequest = {
         text: request.text,
@@ -113,14 +151,16 @@ export class TTSService {
         }
       );
 
-      // Save the audio file
-      const filename = `tts_${uuidv4()}.wav`;
-      const outputPath = path.join(this.tempDir, filename);
-      
-      fs.writeFileSync(outputPath, response.data);
+      // Ensure temp directory exists
+      if (!fs.existsSync(this.tempDir)) {
+        fs.mkdirSync(this.tempDir, { recursive: true });
+      }
+
+      // Save the audio file with cache key filename
+      fs.writeFileSync(cachedFilePath, response.data);
 
       // Get file metadata
-      const stats = fs.statSync(outputPath);
+      const stats = fs.statSync(cachedFilePath);
       
       return {
         success: true,
@@ -150,6 +190,28 @@ export class TTSService {
     let tempVoiceFile: string | null = null;
     
     try {
+      // Generate cache key using text, voice buffer hash, and language
+      const voiceHash = crypto.createHash('sha256').update(voiceBuffer).digest('hex');
+      const cacheKey = this.generateCacheKey(text, voiceHash, language);
+      
+      // Check if cached audio file exists
+      const cachedPath = this.getCachedAudioPath(cacheKey);
+      if (fs.existsSync(cachedPath)) {
+        console.log(`Serving cached audio for key: ${cacheKey}`);
+        const stats = fs.statSync(cachedPath);
+        const cachedFilename = path.basename(cachedPath);
+        
+        return {
+          success: true,
+          audioUrl: `/api/tts/audio/${cachedFilename}`,
+          metadata: {
+            duration: 0,
+            fileSize: stats.size,
+            format: 'wav'
+          }
+        };
+      }
+      
       // Create temporary voice file
       const tempFilename = `temp_voice_${uuidv4()}.wav`;
       tempVoiceFile = path.join(this.tempDir, tempFilename);
@@ -180,18 +242,19 @@ export class TTSService {
         }
       );
 
-      // Save the generated audio file
-      const outputFilename = `tts_${uuidv4()}.wav`;
-      const outputPath = path.join(this.tempDir, outputFilename);
+      // Save the generated audio file with cache-based filename
+      const cachedFilename = `cached_${cacheKey}.wav`;
+      const outputPath = path.join(this.tempDir, cachedFilename);
       
       fs.writeFileSync(outputPath, response.data);
+      console.log(`Generated and cached audio for key: ${cacheKey}`);
 
       // Get file metadata
       const stats = fs.statSync(outputPath);
       
       return {
         success: true,
-        audioUrl: `/api/tts/audio/${outputFilename}`,
+        audioUrl: `/api/tts/audio/${cachedFilename}`,
         metadata: {
           duration: 0,
           fileSize: stats.size,
