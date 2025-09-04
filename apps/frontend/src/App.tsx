@@ -1,44 +1,8 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
-
-// API Configuration
-const API_BASE_URL = '/api';
+import { apiService, VoicePreset } from "./services/apiService";
 
 // Placeholder structures, will import to a zod schema file
-
-// Voice preset data structure
-interface VoicePreset {
-  id: string;
-  name: string;
-  description: string;
-  filePath: string;
-}
-
-// Custom voice upload structure
-interface CustomVoice {
-  id: string;
-  name: string;
-  file?: File; // Optional after upload
-  uploadStatus: "uploading" | "ready" | "error";
-  url?: string; // URL to the uploaded voice file
-}
-
-// API Response types for better type safety
-interface TTSResponse {
-  audioUrl: string;
-  duration: number;
-  voiceId: string;
-}
-
-interface VoicePresetsResponse {
-  voices: VoicePreset[];
-}
-
-interface UploadVoiceResponse {
-  voiceId: string;
-  name: string;
-  url: string;
-}
 
 function App() {
   // State for text input and selected voice
@@ -57,12 +21,12 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [abortController, setAbortController] =
     useState<AbortController | null>(null);
-  const [customVoices, setCustomVoices] = useState<CustomVoice[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [error, setError] = useState<string | null>(null); // Still using alerts for now, will implement error when frontend is ready
+  const [error, setError] = useState<string | null>(null); // Still using alerts for now, can implement error with frontend component
   const [voicePresets, setVoicePresets] = useState<VoicePreset[]>([]);
   const [uploadedCustomVoice, setUploadedCustomVoice] = useState<{ name: string; file: File; objectUrl?: string } | null>(null);
+  const [activePreview, setActivePreview] = useState<HTMLAudioElement | null>(null);
 
   // Text limits configuration
   const TEXT_LIMITS = {
@@ -78,7 +42,6 @@ function App() {
   useEffect(() => {
     try {
       loadVoicePresets();
-      loadCustomVoices(); // Loading custom voices (assuming voices are saved to user account)
     } catch (err) {
       console.error("Error during initial load in useEffect:", err);
     }
@@ -96,36 +59,12 @@ function App() {
   // API ENDPOINT: GET /api/tts/presets
   const loadVoicePresets = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/tts/presets`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setVoicePresets(data.data);
-        console.log(`Loaded ${data.data.length} voice presets from API:`, data.data);
-      } else {
-        throw new Error(data.error || 'Failed to load voice presets');
-      }
+      const presets = await apiService.getVoicePresets();
+      setVoicePresets(presets);
+      console.log(`Loaded ${presets.length} voice presets from API:`, presets);
     } catch (err) {
       console.error("Voice presets loading error:", err);
       setVoicePresets([]); // Clear presets on error
-    }
-  };
-
-  // API ENDPOINT: GET /api/tts/custom-voices
-  const loadCustomVoices = async () => {
-    try {
-      // TODO: Call API to fetch user's saved custom voices
-      // Currently no custom voices loaded on startup
-    } catch (err) {
-      alert(
-        err instanceof Error ? err.message : "Failed to load custom voices"
-      );
-      console.error("Custom voices loading error:", err);
     }
   };
 
@@ -160,7 +99,7 @@ function App() {
     setAbortController(controller);
 
     try {
-      let response;
+      let result;
 
       if (selectedVoice === "custom" && uploadedCustomVoice) {
         // Use custom voice endpoint with FormData
@@ -169,40 +108,19 @@ function App() {
         formData.append('text', text.trim());
         formData.append('language', 'en');
 
-        response = await fetch(`${API_BASE_URL}/tts/speak-with-voice`, {
-          method: 'POST',
-          body: formData,
-          signal: controller.signal
-        });
+        result = await apiService.generateSpeechWithVoice(formData, controller.signal);
       } else {
-        // Use AI voice preset endpoint with JSON
-        response = await fetch(`${API_BASE_URL}/tts/speak`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            text: text.trim(),
-            voicePreset: selectedVoice,
-            language: 'en'
-          }),
-          signal: controller.signal
-        });
+        // Use AI voice preset endpoint
+        result = await apiService.generateSpeech({
+          text: text.trim(),
+          voicePreset: selectedVoice,
+          language: 'en'
+        }, controller.signal);
       }
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.success) {
-        setGeneratedAudioUrl(data.data.audioUrl);
-        console.log('Audio generated successfully:', data.data);
-        alert('Audio generated successfully!');
-      } else {
-        throw new Error(data.error || 'Generation failed');
-      }
+      setGeneratedAudioUrl(result.audioUrl);
+      console.log('Audio generated successfully:', result);
+      alert('Audio generated successfully!');
 
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
@@ -212,10 +130,8 @@ function App() {
         console.error("Generation error:", err);
       }
     } finally {
-      if (!controller.signal.aborted) {
-        setIsGenerating(false);
-        setAbortController(null);
-      }
+      setIsGenerating(false);
+      setAbortController(null);
     }
   };
 
@@ -236,13 +152,7 @@ function App() {
     setIsDownloading(true);
 
     try {
-      const response = await fetch(generatedAudioUrl);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch audio file');
-      }
-
-      const blob = await response.blob();
+      const blob = await apiService.downloadAudio(generatedAudioUrl);
       const url = window.URL.createObjectURL(blob);
       
       const link = document.createElement("a");
@@ -272,39 +182,45 @@ function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // File type validation
-    const validTypes = ["audio/wav", "audio/mpeg", "audio/mp3"];
-    if (!validTypes.includes(file.type)) {
-      alert("Please upload a valid audio file (WAV, MP3)");
-      return;
+    setIsUploading(true);
+
+    try {
+      // File type validation
+      const validTypes = ["audio/wav", "audio/mpeg", "audio/mp3"];
+      if (!validTypes.includes(file.type)) {
+        alert("Please upload a valid audio file (WAV, MP3)");
+        return;
+      }
+
+      // File size validation (30MB limit)
+      const maxSizeInMB = 30;
+      const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
+      if (file.size > maxSizeInBytes) {
+        alert(`File size too large. Maximum ${maxSizeInMB}MB allowed.`);
+        return;
+      }
+
+      // Clean up previous object URL if it exists
+      if (uploadedCustomVoice?.objectUrl) {
+        URL.revokeObjectURL(uploadedCustomVoice.objectUrl);
+      }
+
+      // Create new object URL for the uploaded file
+      const objectUrl = URL.createObjectURL(file);
+
+      // Store the uploaded custom voice for display and selection
+      setUploadedCustomVoice({ 
+        name: file.name.replace(/\.[^/.]+$/, ""), 
+        file,
+        objectUrl 
+      });
+      setSelectedVoice("custom"); // Auto-select the custom voice
+      setGeneratedAudioUrl(null); // Clear any previous audio
+
+      alert('Custom voice uploaded successfully! Click Generate to create narration.');
+    } finally {
+      setIsUploading(false);
     }
-
-    // File size validation (10MB limit)
-    const maxSizeInMB = 10;
-    const maxSizeInBytes = maxSizeInMB * 1024 * 1024;
-    if (file.size > maxSizeInBytes) {
-      alert(`File size too large. Maximum ${maxSizeInMB}MB allowed.`);
-      return;
-    }
-
-    // Clean up previous object URL if it exists
-    if (uploadedCustomVoice?.objectUrl) {
-      URL.revokeObjectURL(uploadedCustomVoice.objectUrl);
-    }
-
-    // Create new object URL for the uploaded file
-    const objectUrl = URL.createObjectURL(file);
-
-    // Store the uploaded custom voice for display and selection
-    setUploadedCustomVoice({ 
-      name: file.name.replace(/\.[^/.]+$/, ""), 
-      file,
-      objectUrl 
-    });
-    setSelectedVoice("custom"); // Auto-select the custom voice
-    setGeneratedAudioUrl(null); // Clear any previous audio
-
-    alert('Custom voice uploaded successfully! Click Generate to create narration.');
 
     // Clear file input
     e.target.value = "";
@@ -329,29 +245,33 @@ function App() {
   };
 
   // Preview voice - plays existing sample files
-  const handlePreview = async (
-    voiceId: string,
-    voiceName: string,
-    e: React.MouseEvent
-  ) => {
+  const handlePreview = (voiceId: string, voiceName: string, e: React.MouseEvent) => {
     e.stopPropagation();
 
-    try {
-      const sampleUrl = `${API_BASE_URL}/tts/audio/samples/${voiceName}.wav`;
-      
-      const audio = new Audio(sampleUrl);
-      audio.volume = 0.7;
-      audio.playbackRate = 1.25; // Set playback speed to 1.25x
-      audio.play().catch(err => {
-        console.error('Sample playback failed:', err);
-        alert(`Could not play preview for ${voiceName}.`);
-      });
-
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Preview failed");
-      console.error("Preview error:", err);
+    if (activePreview) {
+      activePreview.pause();
+      activePreview.currentTime = 0;
     }
+
+    const sampleUrl = apiService.getSampleUrl(voiceName);
+    const newAudio = new Audio(sampleUrl);
+    
+    newAudio.onended = () => {
+      setActivePreview(null);
+    };
+
+    newAudio.volume = 0.7;
+    newAudio.playbackRate = 1.25;
+    
+    newAudio.play().catch(err => {
+      console.error('Sample playback failed:', err);
+      alert(`Could not play preview for ${voiceName}.`);
+      setActivePreview(null);
+    });
+
+    setActivePreview(newAudio);
   };
+
 
   return (
     // Main container
@@ -454,10 +374,10 @@ function App() {
         <button 
           className="secondary-btn upload-voice-btn"
           onClick={handleCustomVoiceButtonClick}
-          disabled={isGenerating}
+          disabled={isGenerating || isUploading}
         >
           <i className="fas fa-upload"></i>
-          Upload Custom Voice
+          {isUploading ? "Uploading..." : "Upload Custom Voice"}
         </button>
         <input
           id="custom-voice-upload"
