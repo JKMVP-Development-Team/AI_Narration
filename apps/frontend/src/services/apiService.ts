@@ -15,10 +15,9 @@ class ApiService {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
     const data = await response.json();
-    if (data.success) {
-      return data.data;
-    } else {
-      throw new Error(data.error || 'Request failed');
+      throw new Error(
+        `API request failed with status ${response.status} (${response.statusText}): ${data.error || 'Unknown error'}`
+      );
     }
   }
 
