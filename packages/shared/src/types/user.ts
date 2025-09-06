@@ -1,8 +1,10 @@
 
 export interface UserAccount {
     _id?: string;
-    name: string;
+    firstName?: string;
+    lastName?: string;
     email: string;
+    clerkId: string;
     stripeCustomerId: string;
     credits: number;
     totalCreditsEverPurchased: number;
@@ -12,14 +14,6 @@ export interface UserAccount {
     status: 'active' | 'inactive' | 'suspended';
 }
 
-export interface UserAddress {
-    city: string;
-    country: string;
-    line1: string;
-    line2?: string;
-    postal_code: string;
-    state: string;
-}
 export interface CreditPurchase {
     _id?: string;
     userId: string;

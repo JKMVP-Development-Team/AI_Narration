@@ -1,9 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useUser, SignOutButton } from "@clerk/clerk-react";
+import { useNavigate } from "react-router-dom";
 import "./App.css";
 import { apiService, VoicePreset } from "./services/apiService";
 
 
 function App() {
+  const { isSignedIn, user, isLoaded } = useUser();
+  const navigate = useNavigate();
+
   // State for text input and selected voice
 
   const [text, setText] = useState(
@@ -22,10 +27,91 @@ function App() {
     useState<AbortController | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+
   const [error, setError] = useState<string | null>(null); // Still using alerts for now, can implement error with frontend component
   const [voicePresets, setVoicePresets] = useState<VoicePreset[]>([]);
   const [uploadedCustomVoice, setUploadedCustomVoice] = useState<{ name: string; file: File; objectUrl?: string } | null>(null);
   const [activePreview, setActivePreview] = useState<HTMLAudioElement | null>(null);
+
+  const [error, setError] = useState<string | null>(null); // Still using alerts for now, will implement error when frontend is ready
+  
+  // API ENDPOINT: GET /api/tts/presets
+  const loadVoicePresets = useCallback(async () => {
+    try {
+      // TODO: Call API to fetch voice presets and update state with setVoicePresets
+      // Currently using hardcoded data
+    } catch (err) {
+      alert(
+        err instanceof Error ? err.message : "Failed to load voice presets"
+      );
+      console.error("Voice presets loading error:", err);
+    }
+  }, []);
+
+  // API ENDPOINT: GET /api/tts/custom-voices
+  const loadCustomVoices = useCallback(async () => {
+    try {
+      // TODO: Call API to fetch user's saved custom voices
+      // Currently no custom voices loaded on startup
+    } catch (err) {
+      alert(
+        err instanceof Error ? err.message : "Failed to load custom voices"
+      );
+      console.error("Custom voices loading error:", err);
+    }
+  }, []);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      navigate('/login');
+    }
+  }, [isSignedIn, isLoaded, navigate]);
+
+
+  // Load initial voice presets
+  useEffect(() => {
+    try {
+      loadVoicePresets();
+      loadCustomVoices(); // Loading custom voices (assuming voices are saved to user account)
+    } catch (err) {
+      console.error("Error during initial load in useEffect:", err);
+    }
+  }, []);
+
+  // Show loading while checking authentication
+  if (!isLoaded) {
+    return (
+      <div className="container">
+        <div style={{ textAlign: 'center', padding: '50px' }}>
+          <h2>Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+
+  const voicePresets: VoicePreset[] = [
+    // Voice presets data - hardcoded for now, will come from API later
+    {
+      id: "sarah",
+      name: "Sarah",
+      style: "Featured",
+      gender: "Female",
+      accent: "American",
+      description:
+        "Clear, professional voice perfect for business presentations",
+    },
+    {
+      id: "david",
+      name: "David",
+      style: "Professional",
+      gender: "Male",
+      accent: "British",
+      description:
+        "Clear, professional voice perfect for business presentations",
+    },
+  ];
+
 
   // Text limits configuration
   const TEXT_LIMITS = {
@@ -35,7 +121,7 @@ function App() {
 
   const characterCount = text.length;
 
-  // API functions
+
 
   // Load initial voice presets
   useEffect(() => {
@@ -66,6 +152,7 @@ function App() {
       setVoicePresets([]); // Clear presets on error
     }
   };
+
 
   // Event Handlers
 
@@ -285,7 +372,7 @@ function App() {
         <ul className="nav-links">
           <li>
             <a 
-              href="#home" 
+              href="/" 
               className={activeTab === 'home' ? 'active' : ''}
               onClick={(e) => { e.preventDefault(); setActiveTab('home'); }}
             >
@@ -298,9 +385,16 @@ function App() {
             </a>
           </li>
           <li>
-            <a href="/signup">
-              <i className="fas fa-user-plus"></i> Sign Up
-            </a>
+            <span className="user-info">
+              <i className="fas fa-user"></i> {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || 'User'}
+            </span>
+          </li>
+          <li>
+            <SignOutButton>
+              <button className="sign-out-btn">
+                <i className="fas fa-sign-out-alt"></i> Sign Out
+              </button>
+            </SignOutButton>
           </li>
           <li>
             <a 

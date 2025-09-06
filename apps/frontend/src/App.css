@@ -701,6 +701,60 @@ button:active {
   line-height: 1.5;
 }
 
+/* Clerk Authentication Styles */
+.clerk-auth-wrapper {
+  margin: 20px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.clerk-card {
+  background: rgba(30, 30, 50, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+.clerk-header {
+  color: #e6e6e6 !important;
+}
+
+.clerk-subtitle {
+  color: #a0a0c0 !important;
+}
+
+
+/* User Navigation Styles */
+.user-info {
+  color: #a0a0c0;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sign-out-btn {
+  background: transparent;
+  color: #e6e6e6;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sign-out-btn:hover {
+  background: rgba(220, 36, 48, 0.1);
+  border-color: rgba(220, 36, 48, 0.3);
+  color: #dc2430;
+}
+
+
 /* Responsive adjustments for credit history */
 @media (max-width: 768px) {
   .credit-header {
@@ -722,6 +776,15 @@ button:active {
   
   .history-filters {
     justify-content: center;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .custom-fields-section {
+    padding: 15px;
   }
 }
 

@@ -1,9 +1,9 @@
 import Stripe from 'stripe';
 import {
     UserAccount,
-    UserAddress
 } from '@shared/types/user';
 
+import { UsageEvent } from '@shared/types/meter';
 import { getUserByUserId, addCreditsToUser, logUserActivity } from './userService';
 import { DatabaseService } from './databaseService';
 
@@ -56,7 +56,6 @@ export async function createCheckoutSession(
             mode: 'payment',
             success_url: `${FRONTEND}`, // TODO Add Success URL
             cancel_url: `${FRONTEND}`, // TODO Add Cancel URL
-            // automatic_tax: { enabled: true }, // TODO Enable tax Update Stripe Business Profile
             customer: user?.stripeCustomerId,
             metadata: {
                 planName: 'Credit Package',
@@ -66,11 +65,8 @@ export async function createCheckoutSession(
                 userEmail: user.email
             },
             allow_promotion_codes: true,
-            billing_address_collection: 'auto',
             customer_update: {
-                address: 'auto',
                 name: 'auto',
-                shipping: 'auto'
             },
             invoice_creation: {
                 enabled: true,
@@ -118,7 +114,7 @@ export async function expireCheckoutSession(sessionId: string): Promise<any> {
 }
 
 
-export async function fulfillCheckout(sessionId: string): Promise<boolean> {
+async function fulfillCheckout(sessionId: string): Promise<boolean> {
     try {
         const stripe = getStripeInstance();
         const db = DatabaseService.getInstance()
@@ -246,7 +242,7 @@ export async function getPriceById(priceId: string): Promise<any | null> {
     }
 }
 
-export async function createStripeCustomer(user: UserAccount, location: UserAddress): Promise<string | null> {
+export async function createStripeCustomer(user: UserAccount): Promise<string | null> {
     try {
         const stripe = getStripeInstance();
 
@@ -260,16 +256,8 @@ export async function createStripeCustomer(user: UserAccount, location: UserAddr
 
         // TODO Text Validation
         const customer = await stripe.customers.create({
-            name: user.name,
+            name: user.firstName + ' ' + user.lastName,
             email: user.email,
-            address: {
-                city: location.city,
-                country: location.country,
-                line1: location.line1,
-                line2: location.line2 || '',
-                postal_code: location.postal_code,
-                state: location.state,
-            },
             metadata: {
                 userId: user._id?.toString() || '',
                 createdAt: user.createdAt.toISOString(),
@@ -331,4 +319,62 @@ export async function deleteStripeCustomer(customerId: string): Promise<boolean>
         console.error('Failed to delete Stripe customer:', error);
         return false;
     }
+}
+
+
+export async function reportToStripe(userId: string, usageEvent: UsageEvent): Promise<void> {
+    try {
+        const stripe = getStripeInstance();
+        const user = await getUserByUserId(userId);
+        
+        if (!user || !user.stripeCustomerId) {
+            console.log(`⚠️ No Stripe customer for user ${userId}, skipping Stripe usage report`);
+            return;
+        }
+
+        await stripe.billing.meterEvents.create({
+            event_name: 'tts_generation',
+            payload: {
+                stripe_customer_id: user.stripeCustomerId,
+                value: usageEvent.cost.toString(),
+            },
+            timestamp: Math.floor(usageEvent.timestamp.getTime() / 1000)
+        });
+
+        console.log(`📊 Reported usage to Stripe for customer ${user.stripeCustomerId}`);
+
+    } catch (error) {
+        console.error('Failed to report usage to Stripe:', error);
+    }
+}
+
+
+
+// =========== STRIPE WEBHOOK HANDLERS ===========
+
+export async function handleCheckoutSessionCompleted(event: any): Promise<void> {
+  console.log(`Checkout session ${event.data.object.id} completed!`);
+  
+  const session = event.data.object;
+  if (session.payment_status === 'paid') {
+    console.log(`Fulfilling credits for session ${session.id}`);
+    try {
+      await fulfillCheckout(session.id);
+      console.log(`Successfully fulfilled session ${session.id}`);
+    } catch (fulfillError) {
+      console.error(`Failed to fulfill session ${session.id}:`, fulfillError);
+    }
+  } else {
+    console.log(`Session ${session.id} payment status: ${session.payment_status}`);
+  }
+}
+
+export async function handleAsyncPaymentSucceeded(event: any): Promise<void> {
+  console.log(`Async payment succeeded for session ${event.data.object.id}`);
+  try {
+    await fulfillCheckout(event.data.object.id);
+    console.log(`Successfully fulfilled async session ${event.data.object.id}`);
+  } catch (fulfillError) {
+    console.error(`Failed to fulfill async session ${event.data.object.id}:`, fulfillError);
+  }
 }

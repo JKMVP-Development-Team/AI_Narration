@@ -1,7 +1,16 @@
 
-.DS_Store
+.DS_Store# Testing
+coverage/
+*.lcov
 
-# Frontend
+# Playwright test results and reports
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Old test folders (tests are now in /tests/)
+apps/*/src/__tests__/
+packages/*/src/__tests__/ntend
 dist/
 **/node_modules/
 **/dist/
@@ -9,3 +18,13 @@ dist/
 
 
 .env
+
+# Testing
+coverage/
+*.lcov
+
+# Playwright Test Results and Reports
+test-results/
+playwright-report/
+playwright/.cache/
+/playwright/.auth/
