@@ -35,6 +35,9 @@ app.use('/webhooks', clerkWebhookRouter);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Static file serving for sample audio files
+app.use('/api/tts/audio/samples', express.static(path.join(__dirname, '../../../xtts-data/speakers/samples')));
+
 
 // Routes
 // To protect the routes, use the requireAuth middleware by redirecting users to sign in if they are not authenticated.

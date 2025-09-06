@@ -2,6 +2,7 @@ import axios from 'axios';
 import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   XTTSApiRequest, 
@@ -34,106 +35,47 @@ export class TTSService {
     this.presetsDir = path.join(this.speakersDir, 'presets');
     
     // API paths
-    this.presetsPath = '/app/speakers/presets';
-    this.userUploadsPath = '/app/speakers/user-uploads';
+    this.presetsPath = '/app/xtts-data/speakers/presets';
+    this.userUploadsPath = '/app/xtts-data/speakers/user-uploads';
+  }
+
+  // Generate cache key for audio caching
+  private generateCacheKey(text: string, voiceId: string, language: string): string {
+    const content = `${text.trim()}|${voiceId}|${language}`;
+    return crypto.createHash('sha256').update(content).digest('hex');
+  }
+
+  // Check if cached audio file exists
+  private getCachedAudioPath(cacheKey: string): string {
+    return path.join(this.tempDir, `cached_${cacheKey}.wav`);
   }
 
   // Voice presets management
   public getVoicePresets(): VoicePreset[] {
-    const presets: VoicePreset[] = [
-      {
-        id: 'josh',
-        name: 'Josh',
-        description: 'American, male, Pittsburgh, Pennsylvania, USA',
-        filePath: `${this.presetsPath}/josh.wav`
-      },
-      {
-        id: 'emily',
-        name: 'Emily',
-        description: 'British, female, Birmingham, UK',
-        filePath: `${this.presetsPath}/emily.wav`
-      },
-      {
-        id: 'liam',
-        name: 'Liam',
-        description: 'Australian, male, Brisbane, Australia',
-        filePath: `${this.presetsPath}/liam.wav`
-      },
-      {
-        id: 'mariah',
-        name: 'Mariah',
-        description: 'Jamaican, female, Saint Anne\'s Bay, Jamaica',
-        filePath: `${this.presetsPath}/mariah.wav`
-      },
-      {
-        id: 'daniel',
-        name: 'Daniel',
-        description: 'American, male, Fairfax, Virginia, USA',
-        filePath: `${this.presetsPath}/daniel.wav`
-      },
-      {
-        id: 'jessica',
-        name: 'Jessica',
-        description: 'American, female, Brooklyn, New York, USA',
-        filePath: `${this.presetsPath}/jessica.wav`
-      },
-      {
-        id: 'marcus',
-        name: 'Marcus',
-        description: 'American, male, Macon, Mississippi, USA',
-        filePath: `${this.presetsPath}/marcus.wav`
-      },
-      {
-        id: 'chloe',
-        name: 'Chloe',
-        description: 'Australian, female, Perth, Australia',
-        filePath: `${this.presetsPath}/chloe.wav`
-      },
-      {
-        id: 'sarah',
-        name: 'Sarah',
-        description: 'American, female, Carthage, Texas, USA',
-        filePath: `${this.presetsPath}/sarah.wav`
-      },
-      {
-        id: 'hannah',
-        name: 'Hannah',
-        description: 'American, female, Davenport, Iowa, USA',
-        filePath: `${this.presetsPath}/hannah.wav`
-      },
-      {
-        id: 'sophie',
-        name: 'Sophie',
-        description: 'British, female, Staffordshire, UK',
-        filePath: `${this.presetsPath}/sophie.wav`
-      },
-      {
-        id: 'lucy',
-        name: 'Lucy',
-        description: 'British, female, Leicester, UK',
-        filePath: `${this.presetsPath}/lucy.wav`
-      },
-      {
-        id: 'oliver',
-        name: 'Oliver',
-        description: 'British, male, Henley-on-Thames, Oxfordshire, UK',
-        filePath: `${this.presetsPath}/oliver.wav`
-      },
-      {
-        id: 'connor',
-        name: 'Connor',
-        description: 'Northern Irish, male, Belfast, Northern Ireland, UK',
-        filePath: `${this.presetsPath}/connor.wav`
-      },
-      {
-        id: 'madison',
-        name: 'Madison',
-        description: 'American, female, Norton, Virginia, USA',
-        filePath: `${this.presetsPath}/madison.wav`
-      }
+    const presetData = [
+      { id: 'josh', name: 'Josh', description: 'American, male, Pittsburgh, Pennsylvania, USA' },
+      { id: 'emily', name: 'Emily', description: 'British, female, Birmingham, UK' },
+      { id: 'liam', name: 'Liam', description: 'Australian, male, Brisbane, Australia' },
+      { id: 'mariah', name: 'Mariah', description: 'Jamaican, female, Saint Anne\'s Bay, Jamaica' },
+      { id: 'daniel', name: 'Daniel', description: 'American, male, Fairfax, Virginia, USA' },
+      { id: 'jessica', name: 'Jessica', description: 'American, female, Brooklyn, New York, USA' },
+      { id: 'marcus', name: 'Marcus', description: 'American, male, Macon, Mississippi, USA' },
+      { id: 'chloe', name: 'Chloe', description: 'Australian, female, Perth, Australia' },
+      { id: 'sarah', name: 'Sarah', description: 'American, female, Carthage, Texas, USA' },
+      { id: 'hannah', name: 'Hannah', description: 'American, female, Davenport, Iowa, USA' },
+      { id: 'sophie', name: 'Sophie', description: 'British, female, Staffordshire, UK' },
+      { id: 'lucy', name: 'Lucy', description: 'British, female, Leicester, UK' },
+      { id: 'oliver', name: 'Oliver', description: 'British, male, Henley-on-Thames, Oxfordshire, UK' },
+      { id: 'connor', name: 'Connor', description: 'Northern Irish, male, Belfast, Northern Ireland, UK' },
+      { id: 'madison', name: 'Madison', description: 'American, female, Norton, Virginia, USA' },
     ];
-
-    return presets;
+    
+    // Map over the data to add the correct, dynamic filePath for the container
+    return presetData.map(p => ({
+      ...p,
+      // This assumes your preset audio files are named like 'Sarah.wav', 'Josh.wav', etc.
+      filePath: `${this.presetsPath}/${p.name}.wav`
+    }));
   }
 
   public getVoicePresetById(id: string): VoicePreset | null {
@@ -145,6 +87,7 @@ export class TTSService {
   public async generateSpeech(request: TTSRequest): Promise<TTSResponse> {
     try {
       let speakerWavPath: string;
+      let voiceId: string;
 
       if (request.voicePreset) {
         const preset = this.getVoicePresetById(request.voicePreset);
@@ -156,15 +99,40 @@ export class TTSService {
         }
 
         speakerWavPath = preset.filePath;
+        voiceId = request.voicePreset;
 
       } else if (request.customVoiceFile) {
         speakerWavPath = request.customVoiceFile;
+        voiceId = 'custom';
       } else {
         return {
           success: false,
           error: 'Either voicePreset or customVoiceFile must be provided'
         };
       }
+
+      // Generate cache key and check for existing cached file
+      const cacheKey = this.generateCacheKey(request.text, voiceId, request.language || 'en');
+      const cachedFilePath = this.getCachedAudioPath(cacheKey);
+      const filename = `cached_${cacheKey}.wav`;
+
+      // Check if cached file exists
+      if (fs.existsSync(cachedFilePath)) {
+        console.log(`Cache hit for key: ${cacheKey}`);
+        const stats = fs.statSync(cachedFilePath);
+        
+        return {
+          success: true,
+          audioUrl: `/api/tts/audio/${filename}`,
+          metadata: {
+            duration: 0,
+            fileSize: stats.size,
+            format: 'wav'
+          }
+        };
+      }
+
+      console.log(`Cache miss for key: ${cacheKey}, generating new audio...`);
 
       const xttsRequest: XTTSApiRequest = {
         text: request.text,
@@ -183,14 +151,16 @@ export class TTSService {
         }
       );
 
-      // Save the audio file
-      const filename = `tts_${uuidv4()}.wav`;
-      const outputPath = path.join(this.tempDir, filename);
-      
-      fs.writeFileSync(outputPath, response.data);
+      // Ensure temp directory exists
+      if (!fs.existsSync(this.tempDir)) {
+        fs.mkdirSync(this.tempDir, { recursive: true });
+      }
+
+      // Save the audio file with cache key filename
+      fs.writeFileSync(cachedFilePath, response.data);
 
       // Get file metadata
-      const stats = fs.statSync(outputPath);
+      const stats = fs.statSync(cachedFilePath);
       
       return {
         success: true,
@@ -220,6 +190,28 @@ export class TTSService {
     let tempVoiceFile: string | null = null;
     
     try {
+      // Generate cache key using text, voice buffer hash, and language
+      const voiceHash = crypto.createHash('sha256').update(voiceBuffer).digest('hex');
+      const cacheKey = this.generateCacheKey(text, voiceHash, language);
+      
+      // Check if cached audio file exists
+      const cachedPath = this.getCachedAudioPath(cacheKey);
+      if (fs.existsSync(cachedPath)) {
+        console.log(`Serving cached audio for key: ${cacheKey}`);
+        const stats = fs.statSync(cachedPath);
+        const cachedFilename = path.basename(cachedPath);
+        
+        return {
+          success: true,
+          audioUrl: `/api/tts/audio/${cachedFilename}`,
+          metadata: {
+            duration: 0,
+            fileSize: stats.size,
+            format: 'wav'
+          }
+        };
+      }
+      
       // Create temporary voice file
       const tempFilename = `temp_voice_${uuidv4()}.wav`;
       tempVoiceFile = path.join(this.tempDir, tempFilename);
@@ -232,10 +224,10 @@ export class TTSService {
       // Save uploaded voice to temp file
       fs.writeFileSync(tempVoiceFile, voiceBuffer);
 
-      // Generate TTS using the temp voice file
+      // Generate TTS using the temp voice file - use container path
       const xttsRequest: XTTSApiRequest = {
         text,
-        speaker_wav: tempVoiceFile,
+        speaker_wav: `/app/xtts-data/output/temp/${tempFilename}`, // Simple container path
         language
       };
 
@@ -250,18 +242,19 @@ export class TTSService {
         }
       );
 
-      // Save the generated audio file
-      const outputFilename = `tts_${uuidv4()}.wav`;
-      const outputPath = path.join(this.tempDir, outputFilename);
+      // Save the generated audio file with cache-based filename
+      const cachedFilename = `cached_${cacheKey}.wav`;
+      const outputPath = path.join(this.tempDir, cachedFilename);
       
       fs.writeFileSync(outputPath, response.data);
+      console.log(`Generated and cached audio for key: ${cacheKey}`);
 
       // Get file metadata
       const stats = fs.statSync(outputPath);
       
       return {
         success: true,
-        audioUrl: `/api/tts/audio/${outputFilename}`,
+        audioUrl: `/api/tts/audio/${cachedFilename}`,
         metadata: {
           duration: 0,
           fileSize: stats.size,

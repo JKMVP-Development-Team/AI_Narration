@@ -9,9 +9,11 @@
   "scripts": {
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:frontend\"",
     "dev:api": "nodemon apps/api/src/index.ts",
+    "dev:worker": "nodemon --exec ts-node apps/worker/src/index.ts",
     "dev:frontend": "vite apps/frontend --port 3000",
-    "build": "npm run build:api && npm run build:frontend",
+    "build": "npm run build:api && npm run build:worker && npm run build:frontend",
     "build:api": "tsc --project tsconfig.api.json",
+    "build:worker": "tsc --outDir dist/worker --rootDir apps/worker/src apps/worker/src/index.ts",
     "build:frontend": "vite build --config vite.config.ts",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
