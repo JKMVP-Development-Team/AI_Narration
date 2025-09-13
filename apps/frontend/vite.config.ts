@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  root: 'apps/frontend',
   build: {
     outDir: '../../dist/frontend',
     emptyOutDir: true
@@ -13,12 +12,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:3001',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => {
-          console.log('Proxying:', path);
-          return path;
-        }
+        changeOrigin: true
       }
     }
   }

@@ -13,51 +13,30 @@ function App() {
 
   const [text, setText] = useState(
     "Welcome to the AI Narration App! This dark mode interface is designed for comfortable extended use. Enter your text and let our AI create beautiful narration for you."
-  );
+);
   const [selectedVoice, setSelectedVoice] = useState<string | null>("josh");
-  const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(
-    null
-  );
+  const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('home'); // State for navigation
 
-
-  // API ready states
   const [isGenerating, setIsGenerating] = useState(false);
-  const [abortController, setAbortController] =
-    useState<AbortController | null>(null);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-
   const [error, setError] = useState<string | null>(null); // Still using alerts for now, can implement error with frontend component
+
   const [voicePresets, setVoicePresets] = useState<VoicePreset[]>([]);
   const [uploadedCustomVoice, setUploadedCustomVoice] = useState<{ name: string; file: File; objectUrl?: string } | null>(null);
   const [activePreview, setActivePreview] = useState<HTMLAudioElement | null>(null);
 
-  const [error, setError] = useState<string | null>(null); // Still using alerts for now, will implement error when frontend is ready
-  
   // API ENDPOINT: GET /api/tts/presets
   const loadVoicePresets = useCallback(async () => {
     try {
-      // TODO: Call API to fetch voice presets and update state with setVoicePresets
-      // Currently using hardcoded data
+      const presets = await apiService.getVoicePresets();
+      setVoicePresets(presets);
+      console.log(`Loaded ${presets.length} voice presets from API:`, presets);
     } catch (err) {
-      alert(
-        err instanceof Error ? err.message : "Failed to load voice presets"
-      );
       console.error("Voice presets loading error:", err);
-    }
-  }, []);
-
-  // API ENDPOINT: GET /api/tts/custom-voices
-  const loadCustomVoices = useCallback(async () => {
-    try {
-      // TODO: Call API to fetch user's saved custom voices
-      // Currently no custom voices loaded on startup
-    } catch (err) {
-      alert(
-        err instanceof Error ? err.message : "Failed to load custom voices"
-      );
-      console.error("Custom voices loading error:", err);
+      setVoicePresets([]); // Clear presets on error
     }
   }, []);
 
@@ -71,13 +50,33 @@ function App() {
 
   // Load initial voice presets
   useEffect(() => {
-    try {
-      loadVoicePresets();
-      loadCustomVoices(); // Loading custom voices (assuming voices are saved to user account)
-    } catch (err) {
-      console.error("Error during initial load in useEffect:", err);
+    // Only run when Clerk has loaded and confirmed user is signed in
+    if (isLoaded && isSignedIn) {
+      try {
+        loadVoicePresets();
+      } catch (err) {
+        console.error("Error during initial load in useEffect:", err);
+      }
     }
-  }, []);
+  // This dependency array ensures the effect re-runs when the auth state changes
+  }, [isLoaded, isSignedIn, loadVoicePresets]);
+
+  // Cleanup object URLs when component unmounts or custom voice changes
+  useEffect(() => {
+    return () => {
+      if (uploadedCustomVoice?.objectUrl) {
+        URL.revokeObjectURL(uploadedCustomVoice.objectUrl);
+      }
+    };
+  }, [uploadedCustomVoice?.objectUrl]);
+
+  // Text limits configuration
+  const TEXT_LIMITS = {
+    max: 1000,
+    min: 5,
+  };
+
+  const characterCount = text.length;
 
   // Show loading while checking authentication
   if (!isLoaded) {
@@ -89,69 +88,6 @@ function App() {
       </div>
     );
   }
-
-  const voicePresets: VoicePreset[] = [
-    // Voice presets data - hardcoded for now, will come from API later
-    {
-      id: "sarah",
-      name: "Sarah",
-      style: "Featured",
-      gender: "Female",
-      accent: "American",
-      description:
-        "Clear, professional voice perfect for business presentations",
-    },
-    {
-      id: "david",
-      name: "David",
-      style: "Professional",
-      gender: "Male",
-      accent: "British",
-      description:
-        "Clear, professional voice perfect for business presentations",
-    },
-  ];
-
-
-  // Text limits configuration
-  const TEXT_LIMITS = {
-    max: 1000,
-    min: 5,
-  };
-
-  const characterCount = text.length;
-
-
-
-  // Load initial voice presets
-  useEffect(() => {
-    try {
-      loadVoicePresets();
-    } catch (err) {
-      console.error("Error during initial load in useEffect:", err);
-    }
-  }, []);
-
-  // Cleanup object URLs when component unmounts or custom voice changes
-  useEffect(() => {
-    return () => {
-      if (uploadedCustomVoice?.objectUrl) {
-        URL.revokeObjectURL(uploadedCustomVoice.objectUrl);
-      }
-    };
-  }, [uploadedCustomVoice?.objectUrl]);
-
-  // API ENDPOINT: GET /api/tts/presets
-  const loadVoicePresets = async () => {
-    try {
-      const presets = await apiService.getVoicePresets();
-      setVoicePresets(presets);
-      console.log(`Loaded ${presets.length} voice presets from API:`, presets);
-    } catch (err) {
-      console.error("Voice presets loading error:", err);
-      setVoicePresets([]); // Clear presets on error
-    }
-  };
 
 
   // Event Handlers

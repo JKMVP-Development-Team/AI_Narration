@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { clerkMiddleware } from '@clerk/express';
 import { ttsRoutes } from './routes/tts';
 import { stripeRoutes } from './routes/stripe';
@@ -11,7 +12,9 @@ import { stripeWebhookRouter } from './webhooks/stripeWebhooks';
 import { clerkWebhookRouter } from './webhooks/clerkWebhooks';
 import { requireAuth, AuthenticatedRequest } from './middleware/auth';
 
-
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') });
