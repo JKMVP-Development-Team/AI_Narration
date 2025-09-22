@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useUser, SignOutButton } from "@clerk/clerk-react";
+import { useUser } from "@clerk/clerk-react";
 import { useNavigate } from "react-router-dom";
 import "./App.css";
 import { apiService, VoicePreset } from "./services/apiService";
+import Navbar from "./components/Navbar";
 
 
 function App() {
@@ -10,18 +11,23 @@ function App() {
   const navigate = useNavigate();
 
   // State for text input and selected voice
-
   const [text, setText] = useState(
     "Welcome to the AI Narration App! This dark mode interface is designed for comfortable extended use. Enter your text and let our AI create beautiful narration for you."
 );
   const [selectedVoice, setSelectedVoice] = useState<string | null>("josh");
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('home'); // State for navigation
+
+  // New state for user info and credits
+  const [userInfo, setUserInfo] = useState<{
+    _id: string;
+    email: string;
+    credits: number;
+  } | null>(null);
+  const [estimatedCost, setEstimatedCost] = useState<number>(0);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null); // Still using alerts for now, can implement error with frontend component
 
   const [voicePresets, setVoicePresets] = useState<VoicePreset[]>([]);
@@ -48,18 +54,38 @@ function App() {
   }, [isSignedIn, isLoaded, navigate]);
 
 
-  // Load initial voice presets
+  // Load initial voice presets and user info
   useEffect(() => {
     // Only run when Clerk has loaded and confirmed user is signed in
-    if (isLoaded && isSignedIn) {
+    if (isLoaded && isSignedIn && user) {
       try {
         loadVoicePresets();
+        loadUserInfo();
       } catch (err) {
         console.error("Error during initial load in useEffect:", err);
       }
     }
   // This dependency array ensures the effect re-runs when the auth state changes
-  }, [isLoaded, isSignedIn, loadVoicePresets]);
+  }, [isLoaded, isSignedIn, user, loadVoicePresets]);
+
+  // Load user info with credits
+  const loadUserInfo = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      const info = await apiService.getUserInfo(user.id);
+      setUserInfo(info);
+      console.log('Loaded user info:', info);
+    } catch (err) {
+      console.error("Failed to load user info:", err);
+    }
+  }, [user?.id]);
+
+  // Calculate estimated cost when text changes
+  useEffect(() => {
+    const cost = Math.max(Math.ceil(text.length / 100), 1);
+    setEstimatedCost(cost);
+  }, [text]);
 
   // Cleanup object URLs when component unmounts or custom voice changes
   useEffect(() => {
@@ -299,50 +325,7 @@ function App() {
     // Main container
     <div className="container">
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="nav-brand">
-          <i className="fas fa-microphone-alt"></i>
-          <span>AI Narration Studio</span>
-        </div>
-        {/* Navigation Button Controls*/}
-        <ul className="nav-links">
-          <li>
-            <a 
-              href="/" 
-              className={activeTab === 'home' ? 'active' : ''}
-              onClick={(e) => { e.preventDefault(); setActiveTab('home'); }}
-            >
-              <i className="fas fa-home"></i> Home
-            </a>
-          </li>
-          <li>
-            <a href="/history">
-              <i className="fas fa-history"></i> History
-            </a>
-          </li>
-          <li>
-            <span className="user-info">
-              <i className="fas fa-user"></i> {user?.firstName || user?.emailAddresses?.[0]?.emailAddress || 'User'}
-            </span>
-          </li>
-          <li>
-            <SignOutButton>
-              <button className="sign-out-btn">
-                <i className="fas fa-sign-out-alt"></i> Sign Out
-              </button>
-            </SignOutButton>
-          </li>
-          <li>
-            <a 
-              href="#settings" 
-              className={activeTab === 'settings' ? 'active' : ''}
-              onClick={(e) => { e.preventDefault(); setActiveTab('settings'); }}
-            >
-              <i className="fas fa-cog"></i> Settings
-            </a>
-          </li>
-        </ul>
-      </nav>
+      <Navbar userInfo={userInfo} showCredits={true} />
 
       <header>
         <h1>AI Narration Studio</h1>
@@ -359,10 +342,13 @@ function App() {
           onChange={handleTextChange}
         />
 
-        {/* Simple character count */}
+        {/* Simple character count and cost estimate */}
         <div className="character-count">
           <span>
             {characterCount} / {TEXT_LIMITS.max}
+          </span>
+          <span className="cost-estimate" style={{ marginLeft: '15px' }}>
+            <i className="fas fa-coins"></i> Cost: {estimatedCost} credits
           </span>
         </div>
       </div>

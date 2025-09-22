@@ -1,39 +1,13 @@
 import { SignUp } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
+import Navbar from './components/Navbar';
 import './App.css';
 
 const Signup: React.FC = () => {
   return (
     <div className="container">
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="nav-brand">
-          <i className="fas fa-microphone-alt"></i>
-          <span>AI Narration Studio</span>
-        </div>
-        <ul className="nav-links">
-          <li>
-            <Link to="/">
-              <i className="fas fa-home"></i> Home
-            </Link>
-          </li>
-          <li>
-            <Link to="/signup" className="active">
-              <i className="fas fa-user-plus"></i> Sign Up
-            </Link>
-          </li>
-          <li>
-            <Link to="/login">
-              <i className="fas fa-sign-in-alt"></i> Login
-            </Link>
-          </li>
-          <li>
-            <Link to="/history">
-              <i className="fas fa-history"></i> History
-            </Link>
-          </li>
-        </ul>
-      </nav>
+      <Navbar showCredits={false} />
 
       <div className="auth-container">
         <div className="auth-card">

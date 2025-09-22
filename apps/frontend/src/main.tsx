@@ -5,6 +5,7 @@ import { ClerkProvider } from '@clerk/clerk-react'
 import App from './App'
 import LandingPage from "./LandingPage";
 import CreditHistory from './CreditHistory';
+import PricingPage from './PricingPage';
 import "./App.css";
 
 import Signup from './Signup'
@@ -28,6 +29,7 @@ root.render(
               <Route path="/signup/*" element={<Signup />} />
               <Route path="/login/*" element={<Login />} />
               <Route path="/history" element={<CreditHistory />} /> 
+              <Route path="/pricing" element={<PricingPage />} />
             </Routes>
         </ClerkProvider>
       </BrowserRouter>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import Navbar from './components/Navbar';
 import './App.css';
 
 // Interface for credit history items
@@ -54,29 +55,7 @@ const CreditHistory: React.FC = () => {
   return (
     <div className="container">
       {/* Navigation Bar */}
-      <nav className="navbar">
-        <div className="nav-brand">
-          <i className="fas fa-microphone-alt"></i>
-          <span>AI Narration Studio</span>
-        </div>
-        <ul className="nav-links">
-          <li>
-            <Link to="/home">
-              <i className="fas fa-home"></i> Home
-            </Link>
-          </li>
-          <li>
-            <Link to="/history" className="active">
-              <i className="fas fa-history"></i> History
-            </Link>
-          </li>
-          <li>
-            <Link to="/signup">
-              <i className="fas fa-user-plus"></i> Sign Up
-            </Link>
-          </li>
-        </ul>
-      </nav>
+      <Navbar showCredits={true} />
 
       <div className="credit-history-container">
         <div className="credit-header">
@@ -85,7 +64,10 @@ const CreditHistory: React.FC = () => {
             <div className="balance-card">
               <h3>Current Balance</h3>
               <div className="balance-amount">{currentCredits} credits</div>
-              <button className="primary-btn">
+              <button 
+                className="primary-btn"
+                onClick={() => window.location.href = '/pricing'}
+              >
                 <i className="fas fa-plus"></i> Buy More Credits
               </button>
             </div>

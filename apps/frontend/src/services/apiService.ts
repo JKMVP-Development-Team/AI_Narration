@@ -74,6 +74,45 @@ class ApiService {
   getSampleUrl(voiceName: string): string {
     return `${API_BASE_URL}/tts/audio/samples/${voiceName}.wav`;
   }
+
+  // Get user info with credit balance
+  async getUserInfo(userId: string): Promise<{
+    _id: string;
+    email: string;
+    credits: number;
+    totalCreditsEverPurchased: number;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/users/${userId}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch user info: ${response.status} ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('Raw user API response:', data);
+    
+    if (data.success && data.user) {
+      return data.user;
+    } else {
+      throw new Error(data.error || 'Failed to get user info');
+    }
+  }
+
+  // Create Stripe checkout session for credit purchase
+  async createCheckoutSession(priceId: string, userId: string): Promise<{
+    sessionId: string;
+    url: string;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/stripe/create-checkout-session`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ priceId, userId })
+    });
+
+    return this.handleResponse(response);
+  }
 }
 
 // Export singleton instance
